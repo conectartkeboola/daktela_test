@@ -741,7 +741,6 @@ function colParentTab ($instId, $tab, $colName) {                               
         if (array_key_exists($tab, $fkList[$instId])) {
             if (array_key_exists($colName, $fkList[$instId][$tab])) {
                 $parenTbl = $fkList[$instId][$tab][$colName];
-                logInfo("FK: ".$tab.".".$colName." -> ".$parenTbl);
                 return $parenTbl;                                               // daný sloupec je FK → vrátí název nadřazené tabulky
             }
         }
@@ -896,7 +895,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         tabItemsIncrem ($colName, "integrErr");
                         continue 2;                                                 // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
                     }
-                    tabItemsIncrem ($instId, $tab, $colName, "integrOk");
+                    tabItemsIncrem ($colName, "integrOk");
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
@@ -1113,7 +1112,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             logInfo("TABULKA ".$tab." Z INSTANCE ".$instId." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:");
             foreach ($tabItems as $colName => $colCounts) {
                 switch ($colName) {
-                    case "total": logInfo("CELKEM: ".$colCounts["integrOK"]." ZÁZNAMŮ INTEGRITNĚ OK, ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE");                   
+                    case "total": logInfo("CELKEM: ".$colCounts["integrOK"]." ZÁZNAMŮ INTEGRITNĚ OK, ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE"); break;                  
                     default:      logInfo("SLOUPEC ".$colName.": ".$colCounts["integrOK"]." ZÁZNAMŮ INTEGRITNĚ OK, ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE");  
                 }
             }            
