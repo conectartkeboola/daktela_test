@@ -799,22 +799,23 @@ foreach ($instances as $instId => $inst) {                                      
     foreach ($tabs_InOut_InOnly[$inst["ver"]] as $tab => $cols) {               // iterace tabulek; $tab - název tabulky, $cols - pole s parametry sloupců
         logInfo("ZAHÁJENO PROHLEDÁVÁNÍ TABULKY ".$tab." Z INSTANCE ".$instId);  // volitelný diagnostický výstup do logu   
         
-        $colId = $pkColId = 0;                                                  // počitadlo sloupců / ID sloupce, který je pro danou tabulku PK (číslováno od 0)
+        $colId = 0;                                                             // počitadlo sloupců (číslováno od 0)
+        $pkColId = NULL;                                                        // ID sloupce, který je pro danou tabulku PK (číslováno od 0; NULL - PK nenelezen)
         foreach ($cols as $colName => $colAttrs) {                              // iterace sloupců
-            if (array_key_exists("pk", $colAttrs)) {                            // nalezen sloupec, který je PK
-                //$pkList[$instId][$tab] = $colName;                              // uložení názvu PK do pole $pkList
+            if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
+                //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
                 $pkColId = $colId;                                              //
-                logInfo($tab." Z INSTANCE ".$instId." - PRIMÁRNÍ KLÍČ NALEZEN :-)");
+                logInfo($tab." Z INSTANCE ".$instId." - PK NALEZEN :-)");
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
-                logInfo($tab." Z INSTANCE ".$instId." - NALEZEN CIZÍ KLÍČ DO TABULKY ".$colAttrs["fk"]);
+                logInfo($tab." Z INSTANCE ".$instId." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]);
             } 
             $colId ++;                                                          // přechod na další sloupec            
         }
         
-        if ($pkColId == 0) {
-            logInfo($tab." Z INSTANCE ".$instId." - NEBYL NALEZEN PRIMÁRNÍ KLÍČ ;-o");
+        if (is_null($pkColId)) {
+            logInfo($tab." Z INSTANCE ".$instId." - NEBYL NALEZEN PK ;-o");
             continue;                                                           // nepokračuje se iterací řádků a načtením hodnot PK do pole, ...
         }                                                                       // ... přejde se rovnou na další tabulku
         // shromáždění hodnot PK z dané tabulky
@@ -829,13 +830,13 @@ foreach ($instances as $instId => $inst) {                                      
     }
 }
 logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");
-logInfo("PŘEDPOKLÁDANÁ DÉLKA INDEXŮ VE VÝSTUPNÍCH TABULKÁCH JE ".$idFormat['idTab']." ČÍSLIC");     // volitelný diagnostický výstup do logu
+logInfo("PŘEDPOKLÁDANÁ DÉLKA INDEXŮ VE VÝSTUPNÍCH TABULKÁCH JE ".$idFormat['instId']+ $idFormat['idTab']." ČÍSLIC");  // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO ZPRACOVÁNÍ DAT");     // volitelný diagnostický výstup do logu
 $idFormatIdEnoughDigits = false;        // příznak potvrzující, že počet číslic určený proměnnou $idFormat["idTab"] dostačoval k indexaci záznamů u všech tabulek (vč. out-only položek)
 while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet číslic určený proměnnou $idFormat["idTab"] dostačoval k indexaci záznamů u všech tabulek (vč. out-only položek)
    
-    foreach ($tabsList_InOut_OutOnly[6] as $tab => $cols) {        
+    foreach ($tabs_InOut_OutOnly[6] as $tab => $cols) {        
         // vytvoření výstupních souborů    
         ${"out_".$tab} = new \Keboola\Csv\CsvFile($dataDir."out".$ds."tables".$ds."out_".$tab.".csv");
         // zápis hlaviček do výstupních souborů
