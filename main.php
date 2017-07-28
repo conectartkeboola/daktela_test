@@ -72,7 +72,7 @@ $tabsInOutV5  = [
                                 "note"                  =>  ["instPrf" => 0],
                                 "attemps"               =>  ["instPrf" => 0],
                                 "qa_user_id"            =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"]
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/]
                             ] 
 ];
 $tabsInOutV56 = [            
@@ -98,18 +98,18 @@ $tabsInOutV56 = [
                             ],
     "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "email"                 =>  ["instPrf" => 0]
                             ],
     "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0],
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "type"                  =>  ["instPrf" => 0],
                                 "paid"                  =>  ["instPrf" => 0]
                             ],
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "idgroup"               =>  ["instPrf" => 1, "fk" => "groups"]
                             ],                              // 'idgroup' je v IN tabulce NÁZEV → neprefixovat
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
@@ -126,7 +126,7 @@ $tabsInOutV56 = [
                             ],
     "fields"            =>  [   "idfield"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "name"                  =>  ["instPrf" => 0]
                             ],
     "records"           =>  [   "idrecord"              =>  ["instPrf" => 1, "pk" => 1],
@@ -139,7 +139,7 @@ $tabsInOutV56 = [
                                 "action"                =>  ["instPrf" => 0],
                                 "edited"                =>  ["instPrf" => 0],
                                 "created"               =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0],
+                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "form"                  =>  ["instPrf" => 0]
                             ]
 ];
@@ -155,7 +155,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "stage"                 => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "time"                  => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "contacts"          =>  [   "idcontact"             => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -166,7 +166,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "iduser"                => ["instPrf" => 1, "fk" => "users"],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "form"                  => ["instPrf" => 0],
                                 "number"                => ["instPrf" => 0]
                             ],
@@ -179,7 +179,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "solution_low"          => ["instPrf" => 0],
                                 "solution_normal"       => ["instPrf" => 0],
                                 "solution_high"         => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "accounts"          =>  [   "idaccount"             => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -189,7 +189,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "iduser"                => ["instPrf" => 1, "fk" => "users"],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "ticketCategories"  =>  [   "idticketcategory"      => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -200,7 +200,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "template_email"        => ["instPrf" => 0],
                                 "template_page"         => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "tickets"           =>  [   "idticket"              => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -231,7 +231,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "first_answer_duration" => ["instPrf" => 0],
                                 "closed"                => ["instPrf" => 0],
                                 "unread"                => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "form"                  => ["instPrf" => 0]
                             ],
     "crmRecordTypes"    =>  [   "idcrmrecordtype"       => ["instPrf" => 1, "pk" => 1],
@@ -240,7 +240,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "created"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "crmRecords"        =>  [   "idcrmrecord"           => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],    
@@ -256,7 +256,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "edited"                => ["instPrf" => 0],
                                 "created"               => ["instPrf" => 0],
                                 "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "form"                  => ["instPrf" => 0]
                             ],
     "crmRecordSnapshots"=>  [   "idcrmrecordsnapshot"   => ["instPrf" => 1, "pk" => 1],
@@ -274,7 +274,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "created_by"            => ["instPrf" => 0],
                                 "time"                  => ["instPrf" => 0],
                                 "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
                             ],
     "activities"        =>  [   "idactivity"            => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -294,7 +294,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "time_open"             => ["instPrf" => 0],
                                 "time_close"            => ["instPrf" => 0],
                                 "created_by"            => ["instPrf" => 1],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
                                 "item"                  => ["instPrf" => 0]
                             ]
 ];
@@ -892,7 +892,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 //$rowIntegrityOk = true;                                             // příznak integritní správnosti řádku
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                 foreach ($cols as $colName => $colAttrs) {
-                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo "validace: "; var_dump($intgVld);
+                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " validace: ".$intgVld;
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case "wrongFK": tabItemsIncr($colName, "integrErr");        // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
