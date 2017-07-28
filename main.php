@@ -38,9 +38,9 @@ $incremHistDays = $incrementalOn && !empty($jsonHistDays) && is_numeric($jsonHis
 // proměnné a konstanty
 
 // seznam instancí Daktela
-$instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
-                2   =>  ["url" => "https://dircom.daktela.com",     "ver" => 5],
-                3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
+$instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5]//,
+              //  2   =>  ["url" => "https://dircom.daktela.com",     "ver" => 5],
+              //  3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
 ];
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // struktura tabulek
@@ -48,7 +48,7 @@ $instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
 // vstupně-výstupní tabulky (načtou se jako vstupy, transformují se a výsledek je zapsán jako výstup)
 $tabsInOutV5  = [
 // "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName)]
-    "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
+/*    "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
                                 "call_time"             =>  ["instPrf" => 0],
                                 "direction"             =>  ["instPrf" => 0],
                                 "answered"              =>  ["instPrf" => 0],
@@ -73,10 +73,10 @@ $tabsInOutV5  = [
                                 "attemps"               =>  ["instPrf" => 0],
                                 "qa_user_id"            =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"]
-                            ]
+                            ] */
 ];
 $tabsInOutV56 = [            
-    "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
+/*    "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
                                 "start_time"            =>  ["instPrf" => 0],
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
@@ -96,7 +96,7 @@ $tabsInOutV56 = [
                                 "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
-    "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
+*/    "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
                                 "email"                 =>  ["instPrf" => 0]
@@ -115,7 +115,7 @@ $tabsInOutV56 = [
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0]
                             ],
-    "recordSnapshots"   =>  [   "idrecordsnapshot"      =>  ["instPrf" => 1, "pk" => 1],
+/*    "recordSnapshots"   =>  [   "idrecordsnapshot"      =>  ["instPrf" => 1, "pk" => 1],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
                                 "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
@@ -141,7 +141,7 @@ $tabsInOutV56 = [
                                 "created"               =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],
                                 "form"                  =>  ["instPrf" => 0]
-                            ]
+                            ] */
 ];
 // nutno dodržet pořadí tabulek:
 // - 'records' a 'recordSnapshots' se odkazují na 'statuses'.'idstatus' → musí být uvedeny až za 'statuses' (pro případ použití commonStatuses)
@@ -806,7 +806,7 @@ foreach ($instances as $instId => $inst) {                                      
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
-                logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]."(SLOUPEC ".$colName.")");
+                logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]." (SLOUPEC ".$colName.")");
             }
             $colId ++;                                                          // přechod na další sloupec            
         }
@@ -891,8 +891,8 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                      echo " | výsledek validace: "; var_dump(integrityValid($instId,$tab,$colName,$row[$colId]));
-                    switch (integrityValid($instId,$tab,$colName,$row[$colId])) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
+                         $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | validace: "; var_dump($intgVld);
+                    switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
                         case NULL:  break;                                          // sloupec není FK               
