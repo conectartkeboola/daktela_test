@@ -736,19 +736,19 @@ function jsonParse ($formArr) {     // formArr je 2D-pole
     }
 }
 function colParentTab ($instId, $tab, $colName) {                               // nalezení názvu nadřazené tabulky pro daný sloupec (je-li sloupec FK)
-    global $fkList;     echo " | count(\$fkList = ".count($fkList);
+    global $fkList;     //echo " | count(\$fkList) = ".count($fkList);
     if (array_key_exists($instId, $fkList)) {
         if (array_key_exists($tab, $fkList[$instId])) {
             if (array_key_exists($colName, $fkList[$instId][$tab])) {   echo " | colParentTab-returns ".$fkList[$instId][$tab][$colName];
                 return $fkList[$instId][$tab][$colName];                        // daný sloupec je FK → vrátí název nadřazené tabulky
             }
         }
-    }                   echo " | colParentTab-returnsNULL";                                                                       // daný sloupec není FK → vrátí NULL
+    }                  // echo " | colParentTab-returnsNULL";                                                                       // daný sloupec není FK → vrátí NULL
 }
 function integrityValid ($instId, $tab, $colName, $unprefixVal) {               // integritní validace
-    global $pkVals;     echo " | count(\$pkVals = ".count($pkVals);
+    global $pkVals;     //echo " | count(\$pkVals) = ".count($pkVals);
     $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK
-                        echo " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab;
+                        echo is_null($colParentTab) ? "" : " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab;
     if (is_null($colParentTab)) {return NULL;}                                  // daný sloupec není FK → vrátí NULL                                                                            
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
     if (array_key_exists($colParentTab, $pkVals[$instId])) {
