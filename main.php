@@ -749,17 +749,18 @@ function integrityValid ($instId, $tab, $colName, $unprefixVal) {               
     global $pkVals;     //echo " | count(\$pkVals) = ".count($pkVals);
     $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK
                         echo is_null($colParentTab) ? "" : " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab;
-    if (is_null($colParentTab)) {return NULL;}                                  // daný sloupec není FK → vrátí NULL                                                                            
+    if (is_null($colParentTab)) {return "notFK";}                               // daný sloupec není FK → vrátí "notFK"                                                                         
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
     if (array_key_exists($colParentTab, $pkVals[$instId])) {
             if (in_array($unprefixVal, $pkVals[$instId][$colParentTab])) {
-                return true;                                                    // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
+                return "validFK";                                               // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
             } else {
                 logInfo("INSTANCE ".$instId.": HODNOTA ".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
-                return false;                                                   // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
+                return "wrongFK";                                               // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
             }
         }
-    }                                                                           // v poli $pkVals nenalezen některý z potřebných klíčů → o integritní správnosti nelze rozhodnout (vrátí NULL)
+    }
+    return "unfound";                                                           // v poli $pkVals nenalezen některý z potřebných klíčů → o integritní správnosti nelze rozhodnout (vrátí "NA")
 }
 function tabItemsIncr ($colName, $integrValidResult) {                          // inkrement počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci
     global $tabItems;                                                           // $integrValidResult = "integrOk" / "integrErr"
@@ -893,10 +894,11 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 foreach ($cols as $colName => $colAttrs) {
                     $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo "validace: "; var_dump($intgVld);
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
-                        case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
-                        case false: tabItemsIncr($colName, "integrErr");            // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
-                                    /*$rowIntegrityOk = false;*/  continue 3;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
-                        case NULL:  break;                                          // sloupec není FK               
+                        case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
+                        case "wrongFK": tabItemsIncr($colName, "integrErr");        // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                                    /*$rowIntegrityOk = false;*/  continue 3;          // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
+                        case "notFK":  break;                                       // sloupec není FK
+                        case "unfound":break;                                       // v poli $pkVals nenalezen některý z potřebných klíčů
                     }
                     $colId++;
                 } 
