@@ -886,17 +886,25 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {                // načítání řádků vstupních tabulek [= iterace řádků]
                 if ($rowNum == 0) {continue;}                                       // vynechání hlavičky tabulky
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
-                unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity
-                $colId  = 0;                                                        // index sloupce (v každém řádku číslovány sloupce 0,1,2,...)
-                
-                foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
-                    // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                         $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | validace: "; var_dump($intgVld);
+                unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
+                // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                $rowIntegrityOk = true;
+                $colId  = 0;                                                        // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
+                foreach ($cols as $colName => $colAttrs) {
+                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | validace: "; var_dump($intgVld);
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
-                        case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                        case false: tabItemsIncr($colName, "integrErr");            // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                                    $rowIntegrityOk = false;  break 2;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
                         case NULL:  break;                                          // sloupec není FK               
                     }
+                    $colId++;
+                } 
+                if (!$rowIntegrityOk) {continue;}                                   // integritně nevyhovující řádek se dále nezpracovává (→ přechod k dalšímu řádku vst. tabulky)
+                // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                
+                $colId  = 0;                                                        // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
+                
+                foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
         /*            // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
@@ -1115,9 +1123,9 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentOk  = $tabItems["total"]["integrOk"] > 0 ? round($colCounts["integrOk"] /$tabItems["total"]["integrOk"] *100 , 1) : "--"; // procento integritně správných hodnot v tabulce (% na 1 des. místo)
                 $percentErr = $tabItems["total"]["integrErr"]> 0 ? round($colCounts["integrErr"]/$tabItems["total"]["integrErr"]*100 , 1) : "--"; // procento integritně chybných hodnot v tabulce (% na 1 des. místo)
                 switch ($colName) {
-                    case "total":   logInfo(" CELKEM: ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (".$percentErr."%)");
+                    case "total":   logInfo("\tCELKEM: ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (".$percentErr."%)");
                                     break;                  
-                    default:        logInfo(" SLOUPEC ".$colName.": ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (".$percentErr."%)");  
+                    default:        logInfo("\tSLOUPEC ".$colName.": ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (".$percentErr."%)");  
                 }
             }            
         }
