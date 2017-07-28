@@ -736,34 +736,31 @@ function jsonParse ($formArr) {     // formArr je 2D-pole
     }
 }
 function colParentTab ($instId, $tab, $colName) {                               // nalezení názvu nadřazené tabulky pro daný sloupec (je-li sloupec FK)
-    global $fkList, $diagOutOptions;
+    global $fkList;
     if (array_key_exists($instId, $fkList)) {
         if (array_key_exists($tab, $fkList[$instId])) {
             if (array_key_exists($colName, $fkList[$instId][$tab])) {
-                $parenTbl = $fkList[$instId][$tab][$colName];
-                return $parenTbl;                                               // daný sloupec je FK → vrátí název nadřazené tabulky
+                return $fkList[$instId][$tab][$colName];                        // daný sloupec je FK → vrátí název nadřazené tabulky
             }
         }
     }                                                                           // daný sloupec není FK → vrátí NULL
 }
 function integrityValid ($instId, $tab, $colName, $unprefixVal) {               // integritní validace
-    global $pkVals, $diagOutOptions;
+    global $pkVals;
     $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK 
-    if (is_null($colParentTab)) {return true;}                                  // daný sloupec není FK → vrátí true                                                                              
+    if (is_null($colParentTab)) {return NULL;}                                  // daný sloupec není FK → vrátí NULL                                                                            
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
-        if (array_key_exists($colParentTab, $pkVals[$instId])) {
-            if (array_key_exists($colName, $pkVals[$instId][$colParentTab])) {
-                if (array_key_exists($unprefixVal, $pkVals[$instId][$colParentTab][$colName])) {
-                    return true;                                                // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
-                } else {
-                    logInfo("INSTANCE ".$instId.": HODNOTA ".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
-                    return false;                                               // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
-                }
+    if (array_key_exists($colParentTab, $pkVals[$instId])) {
+            if (array_key_exists($unprefixVal, $pkVals[$instId][$colParentTab])) {
+                return true;                                                    // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
+            } else {
+                logInfo("INSTANCE ".$instId.": HODNOTA ".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
+                return false;                                                   // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
             }
         }
     }                                                                           // v poli $pkVals nenalezen některý z potřebných klíčů → o integritní správnosti nelze rozhodnout (vrátí NULL)
 }
-function tabItemsIncrem ($colName, $integrValidResult) {                        // inkrement počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci
+function tabItemsIncr ($colName, $integrValidResult) {                          // inkrement počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci
     global $tabItems;                                                           // $integrValidResult = "integrOk" / "integrErr"
     // test existence potřebných počitadel v poli $tabItems, založení chybějících počitadel s nulovou hodnotou
     if(!array_key_exists($colName, $tabItems))              {$tabItems[$colName] = [];}
@@ -774,7 +771,7 @@ function tabItemsIncrem ($colName, $integrValidResult) {                        
     if(!array_key_exists("integrErr", $tabItems["total"] )) {$tabItems["total"] ["integrErr"]= 0;}
     // inkrement požadovaných počitadel
     $tabItems[$colName][$integrValidResult]++;
-    $tabItems["total"] [$integrValidResult]++;    
+    $tabItems["total"] [$integrValidResult]++;
 }
 logInfo("PROMĚNNÉ A FUNKCE ZAVEDENY");                                          // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
@@ -804,7 +801,7 @@ foreach ($instances as $instId => $inst) {                                      
             if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
                 //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
                 $pkColId = $colId;                                              //
-                logInfo($tab." Z INSTANCE ".$instId." - PK NALEZEN :-)");
+                logInfo($tab." Z INSTANCE ".$instId." - PK NALEZEN");
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
@@ -814,7 +811,7 @@ foreach ($instances as $instId => $inst) {                                      
         }
         
         if (is_null($pkColId)) {
-            logInfo($tab." Z INSTANCE ".$instId." - NEBYL NALEZEN PK ;-o");
+            logInfo($tab." Z INSTANCE ".$instId." - NEBYL NALEZEN PK");
             continue;                                                           // nepokračuje se iterací řádků a načtením hodnot PK do pole, ...
         }                                                                       // ... přejde se rovnou na další tabulku
         // shromáždění hodnot PK z dané tabulky
@@ -825,11 +822,12 @@ foreach ($instances as $instId => $inst) {                                      
         $pkVals[$instId][$tab] = array_values(array_unique($pkVals[$instId][$tab]));// eliminace případných multiplicit hodnot PK (ale neměly by se vyskytovat)
         $pkValsTabCnt = count($pkVals[$instId][$tab]);                          // počet unikátních hodnot PK pro danou tabulku  
         checkIdLengthOverflow($pkValsTabCnt);                                   // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
-        logInfo("V TABULCE ".$tab." Z INSTANCE ".$instId." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ");
+        logInfo("V TABULCE ".$tab." Z INSTANCE ".$instId." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");
     }
 }
 logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");
-logInfo("PŘEDPOKLÁDANÁ DÉLKA INDEXŮ VE VÝSTUPNÍCH TABULKÁCH JE ".$idFormat['instId']+ $idFormat['idTab']." ČÍSLIC");  // volitelný diagnostický výstup do logu
+$expectedDigs = $idFormat["instId"] + $idFormat["idTab"];
+logInfo("PŘEDPOKLÁDANÁ DÉLKA INDEXŮ VE VÝSTUPNÍCH TABULKÁCH JE ".$expectedDigs." ČÍSLIC");  // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO ZPRACOVÁNÍ DAT");     // volitelný diagnostický výstup do logu
 $idFormatIdEnoughDigits = false;        // příznak potvrzující, že počet číslic určený proměnnou $idFormat["idTab"] dostačoval k indexaci záznamů u všech tabulek (vč. out-only položek)
@@ -891,11 +889,12 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                    if (!integrityValid($instId, $tab, $colName, $row[$colId])) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
-                        tabItemsIncrem ($colName, "integrErr");
-                        continue 2;                                                 // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                    $integValid= integrityValid($instId,$tab,$colName,$row[$colId]);// integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
+                    switch ($integValid) {
+                        case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
+                        case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                        case NULL:  break;                                          // sloupec není FK               
                     }
-                    tabItemsIncrem ($colName, "integrOk");
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
