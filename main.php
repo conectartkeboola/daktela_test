@@ -96,17 +96,17 @@ $tabsInOutV56 = [
                                 "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
-*/    "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
+*/  /*  "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
                                 "email"                 =>  ["instPrf" => 0]
                             ],
-    "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
+*/    "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],
                                 "type"                  =>  ["instPrf" => 0],
                                 "paid"                  =>  ["instPrf" => 0]
-                            ],
+                            ]/*,
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
@@ -888,21 +888,21 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
                 unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                $rowIntegrityOk = true;
-                $colId  = 0;                                                        // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
+                //$rowIntegrityOk = true;                                             // příznak integritní správnosti řádku
+                $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                 foreach ($cols as $colName => $colAttrs) {
-                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | validace: "; var_dump($intgVld);
+                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo "validace: "; var_dump($intgVld);
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr");            // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
-                                    $rowIntegrityOk = false;  break 2;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
+                                    /*$rowIntegrityOk = false;*/  break 3;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
                         case NULL:  break;                                          // sloupec není FK               
                     }
                     $colId++;
                 } 
-                if (!$rowIntegrityOk) {continue;}                                   // integritně nevyhovující řádek se dále nezpracovává (→ přechod k dalšímu řádku vst. tabulky)
+                //if (!$rowIntegrityOk) {continue;}                                   // integritně nevyhovující řádek se dále nezpracovává (→ přechod k dalšímu řádku vst. tabulky)
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                
-                $colId  = 0;                                                        // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
+                $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                 
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
         /*            // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
