@@ -747,7 +747,8 @@ function colParentTab ($instId, $tab, $colName) {                               
 }
 function integrityValid ($instId, $tab, $colName, $unprefixVal) {               // integritní validace
     global $pkVals;
-    $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK 
+    $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK
+      echo " | \$colParentTab = ".$colParentTab;
     if (is_null($colParentTab)) {return NULL;}                                  // daný sloupec není FK → vrátí NULL                                                                            
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
     if (array_key_exists($colParentTab, $pkVals[$instId])) {
@@ -801,7 +802,7 @@ foreach ($instances as $instId => $inst) {                                      
             if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
                 //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
                 $pkColId = $colId;
-                logInfo("TABULKA ".$instId."_".$tab." - PK NALEZEN (SLOUPEC ".$pkColId.")");
+                logInfo("TABULKA ".$instId."_".$tab." - PK NALEZEN (SLOUPEC #".$pkColId.")");
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
@@ -894,7 +895,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
                         case NULL:  break;                                          // sloupec není FK               
-                    }
+                    }     echo " | výsledek validace: "; var_dump(integrityValid($instId,$tab,$colName,$row[$colId]));
         /*            // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
@@ -1110,12 +1111,12 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             if (empty($tabItems)) {continue;}                                       // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
             logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:");
             foreach ($tabItems as $colName => $colCounts) {      logInfo("\$tabItems[".$colName."]: ");  print_r($colCounts);
-                $percentOk  = round($colCounts["integrOk"] / $tabItems["total"]["integrOk"] * 100 , 1); // procento integritně správných hodnot v tabulce (% na 1 des. místo)
-                $percentErr = round($colCounts["integrErr"]/ $tabItems["total"]["integrErr"]* 100 , 1); // procento integritně chybných hodnot v tabulce (% na 1 des. místo)
+                $percentOk  = $tabItems["total"]["integrOk"] > 0 ? round($colCounts["integrOk"] /$tabItems["total"]["integrOk"] *100 , 1) : "--"; // procento integritně správných hodnot v tabulce (% na 1 des. místo)
+                $percentErr = $tabItems["total"]["integrErr"]> 0 ? round($colCounts["integrErr"]/$tabItems["total"]["integrErr"]*100 , 1) : "--"; // procento integritně chybných hodnot v tabulce (% na 1 des. místo)
                 switch ($colName) {
-                    case "total":   logInfo(" CELKEM: ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (.$percentOk. %), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE");
+                    case "total":   logInfo(" CELKEM: ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (.$percentOk. %), ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (.$percentErr. %)");
                                     break;                  
-                    default:        logInfo(" SLOUPEC ".$colName.": ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK, ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE");  
+                    default:        logInfo(" SLOUPEC ".$colName.": ".$colCounts["integrOk"]." ZÁZNAMŮ INTEGRITNĚ OK (.$percentOk., ".$colCounts["integrErr"]." ZÁZNAMŮ S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE (.$percentErr. %)");  
                 }
             }            
         }
