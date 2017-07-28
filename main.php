@@ -895,7 +895,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr");            // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
-                                    /*$rowIntegrityOk = false;*/  break 3;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
+                                    /*$rowIntegrityOk = false;*/  continue 3;              // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
                         case NULL:  break;                                          // sloupec není FK               
                     }
                     $colId++;
