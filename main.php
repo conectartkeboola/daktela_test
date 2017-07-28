@@ -891,11 +891,12 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                      echo " | výsledek validace: "; var_dump(integrityValid($instId,$tab,$colName,$row[$colId]));
                     switch (integrityValid($instId,$tab,$colName,$row[$colId])) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
                         case NULL:  break;                                          // sloupec není FK               
-                    }     echo " | výsledek validace: "; var_dump(integrityValid($instId,$tab,$colName,$row[$colId]));
+                    }
         /*            // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
