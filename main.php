@@ -48,7 +48,7 @@ $instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5]/
 // vstupně-výstupní tabulky (načtou se jako vstupy, transformují se a výsledek je zapsán jako výstup)
 $tabsInOutV5  = [
 // "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName)]
-/*    "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
+    "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
                                 "call_time"             =>  ["instPrf" => 0],
                                 "direction"             =>  ["instPrf" => 0],
                                 "answered"              =>  ["instPrf" => 0],
@@ -73,10 +73,10 @@ $tabsInOutV5  = [
                                 "attemps"               =>  ["instPrf" => 0],
                                 "qa_user_id"            =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"]
-                            ] */
+                            ] 
 ];
 $tabsInOutV56 = [            
-/*    "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
+    "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
                                 "start_time"            =>  ["instPrf" => 0],
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
@@ -96,17 +96,17 @@ $tabsInOutV56 = [
                                 "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
-*/  /*  "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
+    "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
                                 "email"                 =>  ["instPrf" => 0]
                             ],
-*/    "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
+    "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],
                                 "type"                  =>  ["instPrf" => 0],
                                 "paid"                  =>  ["instPrf" => 0]
-                            ]/*,
+                            ],
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0, "fk" => "instances"],
@@ -115,7 +115,7 @@ $tabsInOutV56 = [
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0]
                             ],
-/*    "recordSnapshots"   =>  [   "idrecordsnapshot"      =>  ["instPrf" => 1, "pk" => 1],
+    "recordSnapshots"   =>  [   "idrecordsnapshot"      =>  ["instPrf" => 1, "pk" => 1],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
                                 "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
@@ -141,7 +141,7 @@ $tabsInOutV56 = [
                                 "created"               =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],
                                 "form"                  =>  ["instPrf" => 0]
-                            ] */
+                            ]
 ];
 // nutno dodržet pořadí tabulek:
 // - 'records' a 'recordSnapshots' se odkazují na 'statuses'.'idstatus' → musí být uvedeny až za 'statuses' (pro případ použití commonStatuses)
