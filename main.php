@@ -751,7 +751,7 @@ function integrityValid ($instId, $tab, $colName, $unprefixVal) {               
     if (is_null($colParentTab)) {return NULL;}                                  // daný sloupec není FK → vrátí NULL                                                                            
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
     if (array_key_exists($colParentTab, $pkVals[$instId])) {
-            if (array_key_exists($unprefixVal, $pkVals[$instId][$colParentTab])) {
+            if (in_array($unprefixVal, $pkVals[$instId][$colParentTab])) {
                 return true;                                                    // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
             } else {
                 logInfo("INSTANCE ".$instId.": HODNOTA ".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
@@ -889,8 +889,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                    $integValid= integrityValid($instId,$tab,$colName,$row[$colId]);// integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
-                    switch ($integValid) {
+                    switch (integrityValid($instId,$tab,$colName,$row[$colId])) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case true:  tabItemsIncr($colName, "integrOk");  break;     // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case false: tabItemsIncr($colName, "integrErr"); continue 3;// řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
                         case NULL:  break;                                          // sloupec není FK               
