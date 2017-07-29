@@ -671,8 +671,9 @@ function initFields () {                // nastavení výchozích hodnot proměn
     global $fields;
     $fields = [];                       // 2D-pole formulářových polí - prvek pole má tvar <name> => ["idfield" => <hodnota>, "title" => <hodnota>]    
 }
-function iterStatuses ($val, $valType = "statusIdOrig") {   // prohledání 3D-pole stavů $statuses
-    global $statuses;                   // $val = hledaná hodnota;  $valType = "title" / "statusIdOrig"
+function iterStatuses ($val, $valType = "statusIdOrig") {               // prohledání 3D-pole stavů $statuses
+    global $statuses, $emptyToNA, $fakeId;                              // $val = hledaná hodnota;  $valType = "title" / "statusIdOrig"
+    if ($emptyToNA && empty($val)) {return $fakeId;}                    // hodnota FK je sice prázdná, ale bude nahrazena hodnotou $fakeId (typicky "n/a")
     foreach ($statuses as $statId => $statRow) {
         switch ($valType) {
             case "title":           // $statRow[$valType] je string
@@ -884,7 +885,8 @@ foreach ($instances as $instId => $inst) {                                      
         $pkValsTabCnt = count($pkVals[$instId][$tab]);                          // počet unikátních hodnot PK pro danou tabulku  
         checkIdLengthOverflow($pkValsTabCnt);                                   // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
         logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");
-            if($pkValsTabCnt <= 100) {logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": "); print_r($pkVals[$instId][$tab]);}
+            logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ");  print_r(array_slice($pkVals[$instId][$tab], 0, 100));
+            if($pkValsTabCnt > 100) {logInfo("[zkrácený výpis]");}
     }
 }
 logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");
@@ -1181,9 +1183,9 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentFak = $colSum > 0 ? round($colFak/$colSum *100 , 1) : "--"; // procento integritně správných hodnot v tabulce po náhrafě prázdných hodnot FK hodnotou $fakeId
                 $percentErr = $colSum > 0 ? round($colErr/$colSum *100 , 1) : "--"; // procento integritně chybných hodnot v tabulce
                 switch ($colName) {
-                    case "total":   logInfo("CELKEM: ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");
+                    case "total":   logInfo("CELKEM: ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");
                                     break;                  
-                    default:        logInfo("SLOUPEC ".$colName.": ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");  
+                    default:        logInfo("SLOUPEC ".$colName.": ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");  
                 }
             }            
         }
