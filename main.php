@@ -12,6 +12,7 @@ $configFile = $dataDir."config.json";
 $config     = json_decode(file_get_contents($configFile), true);
 
 // parametry importované z konfiguračního JSON v KBC
+$integrityValidationOn  = $config["parameters"]["integrityValidationOn"];
 $callsIncrementalOutput = $config["parameters"]["callsIncrementalOutput"];
 $diagOutOptions         = $config["parameters"]["diagOutOptions"];          // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, detailIntegrInfo
 $adhocDump              = $config["parameters"]["adhocDump"];               // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
@@ -480,7 +481,7 @@ $instCommonOuts = ["statuses" => 1, "groups" => 1, "fieldValues" => 1];
 $emptyToNA   = true;
 $fakeId      = "n/a";
 $fakeTitle   = "(empty value)";
-$tabsFakeRow = $tabsList_InOut[5] + $tabsList_InOut[6];     // = všechny InOut tabulky napříč verzemi (původně jen ["users", "statuses"])
+$tabsFakeRow = $tabsList_InOut[5] + $tabsList_InOut[6];     // = všechny InOut tabulky (sjednocení) napříč verzemi (původně jen ["users", "statuses"])
 
 // počty číslic, na které jsou doplňovány ID's (kvůli řazení v GoodData je výhodné mít konst. délku ID's) a oddělovač prefixu od hodnoty
 $idFormat = [
@@ -912,6 +913,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             ${"out_".$ftab} -> writeRow($frow);
             logInfo("VLOŽEN UMĚLÝ ZÁZNAM S ID ".$fakeId." A NÁZVEM ".$fakeTitle." DO VÝSTUPNÍ TABULKY ".$ftab); // volitelný diag. výstup do logu
         }               // umělý řádek do aktuálně iterované tabulky ... ["n/a", "(empty value"), "", ... , ""]          
+        $out_groups -> writeRow([$fakeId, $fakeTitle]);
     }
     // ==========================================================================================================================================================================================
     // zápis záznamů do výstupních souborů
@@ -947,20 +949,22 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
                 unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                // integritní validace hodnot v aktuálním řádku
+                // integritní validace hodnot v aktuálním řádku [pro aktuální instanci, tabulku a sloupec] (= test existence odpovídajícího záznamu v nadřazené tabulce)
+                if ($integrityValidationOn) {
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
-                foreach ($cols as $colName => $colAttrs) {
-                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]);          //echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
-                    switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
-                        case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
-                        case "2fakeFK": tabItemsIncr($colName, "integrFak"); break; // hodnota FK je prázdná, ale bude nahrazena $fakeId [typicky "n/a"] (→ poté integritně OK)
-                        case "wrongFK": tabItemsIncr($colName, "integrErr");        // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
-                                        continue 3;                                 // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
-                        case "notFK":  break;                                       // sloupec není FK
-                        case "unfound":break;                                       // v poli $pkVals nenalezen některý z potřebných klíčů
+                    foreach ($cols as $colName => $colAttrs) {
+                        $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]);          //echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
+                        switch ($intgVld) {
+                            case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
+                            case "2fakeFK": tabItemsIncr($colName, "integrFak"); break; // hodnota FK je prázdná, ale bude nahrazena $fakeId [typicky "n/a"] (→ poté integritně OK)
+                            case "wrongFK": tabItemsIncr($colName, "integrErr");        // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
+                                            continue 3;                                 // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
+                            case "notFK":  break;                                       // sloupec není FK
+                            case "unfound":break;                                       // v poli $pkVals nenalezen některý z potřebných klíčů
+                        }
+                        $colId++;
                     }
-                    $colId++;
-                } 
+                }
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                
                 // zpracování hodnot v aktuálním řádku
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
@@ -975,7 +979,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                     $afterJsonProc = jsonProcessing($instId,$tab,$colName,$hodnota);// jsonProcessing - test, zda je ve sloupci JSON; když ano, rozparsuje se
                     if (!$afterJsonProc) {$colId++; continue;}                      // přechod na další sloupec
                     
-                    $colParentTab = colParentTab($instId, $tab, $colName);          // test, zda je daný sloupec FL; když ano, aplikuje se na hodnotu fce emptyToNA (u FK vrátí název nadřazené tabulky, u ne-FK NULL)
+                    $colParentTab = colParentTab($instId, $tab, $colName);          // test, zda je daný sloupec FK; když ano, aplikuje se na hodnotu fce emptyToNA (u FK vrátí název nadřazené tabulky, u ne-FK NULL)
                     $hodnota = is_null($colParentTab) ? $hodnota : emptyToNA($hodnota); // emptyToNA - prázdné hodnoty nahradí $fakeId (typicky "n/a") kvůli integritní správnosti
                     
                     switch ([$tab, $colName]) {
@@ -983,8 +987,8 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         case ["pauses", "paid"]:    $colVals[] = boolValsUnify($hodnota);                       // dvojici bool. hodnot ("",1) u v6 převede na dvojici hodnot (0,1) používanou u v5                                 
                                                     break;
                         case ["queues", "idgroup"]: $groupName = groupNameParse($hodnota);                      // název skupiny parsovaný z queues.idgroup pomocí delimiterů
-                                                    if (!strlen($groupName)) {                                  // název skupiny ve vstupní tabulce 'queues' nevyplněn ...
-                                                        $colVals[] = "";  break;                                // ... → stav se do výstupní tabulky 'queues' nezapíše
+                                                    if (empty($groupName)) {                                    // název skupiny ve vstupní tabulce 'queues' nevyplněn ...
+                                                        $colVals[] = emptyToNA($groupName);  break;             // ... → stav se do výstupní tabulky 'queues' nezapíše
                                                     }  
                                                     if (!array_key_exists($groupName, $groups)) {               // skupina daného názvu dosud není uvedena v poli $groups 
                                                         $idGroup++;                                             // inkrement umělého ID skupiny   
@@ -1048,6 +1052,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         case ["records","idrecord"]:$idFieldSrcRec = $colVals[] = $hodnota;     // uložení hodnoty 'idrecord' pro následné použití ve 'fieldValues'
                                                     break;
                         case ["records","idstatus"]:$idstat = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
+                                                    $colVals[] = $idstat;
                                                     break;
                         case ["records", "number"]: $colVals[] = phoneNumberCanonic($hodnota);  // veřejné tel. číslo v kanonickém tvaru (bez '+')
                                                     break;
@@ -1163,6 +1168,8 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             }   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
             // operace po zpracování dat v celé tabulce
             logInfo("DOKONČENO ZPRACOVÁNÍ TABULKY ".$instId."_".$tab);              // volitelný diagnostický výstup do logu
+            
+            if (!$integrityValidationOn) {continue;}                                // není prováděna integritní validace → přechod k další tabulce  
             if (empty($tabItems)) {continue;}                                       // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
             logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:");
             foreach ($tabItems as $colName => $colCounts) {      logInfo("\$tabItems[".$colName."]: ");  print_r($colCounts);
