@@ -110,7 +110,7 @@ $tabsInOutV56 = [
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "idgroup"               =>  ["instPrf" => 1, "fk" => "groups"]
+                                "idgroup"               =>  ["instPrf" => 1/*, "fk" => "groups"*/]
                             ],                              // 'idgroup' je v IN tabulce NÁZEV → neprefixovat
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0]
@@ -119,7 +119,7 @@ $tabsInOutV56 = [
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
                                 "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
-                                "idcall"                =>  ["instPrf" => 1, "fk" => "calls"],
+                                "idcall"                =>  ["instPrf" => 1/*, "fk" => "calls"*/],
                                 "created"               =>  ["instPrf" => 0],
                                 "created_by"            =>  ["instPrf" => 1],
                                 "nextcall"              =>  ["instPrf" => 0]
@@ -135,12 +135,12 @@ $tabsInOutV56 = [
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
                                 "iddatabase"            =>  ["instPrf" => 1, "fk" => "databases"],
                                 "number"                =>  ["instPrf" => 0],
-                                "idcall"                =>  ["instPrf" => 1, "fk" => "calls"],
+                                "idcall"                =>  ["instPrf" => 1/*, "fk" => "calls"*/],
                                 "action"                =>  ["instPrf" => 0],
                                 "edited"                =>  ["instPrf" => 0],
                                 "created"               =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  =>  ["instPrf" => 0]
+                                "form"                  =>  ["instPrf" => 0, "json" => 0]               // "json" => <0/1> ~ jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty
                             ]
 ];
 // nutno dodržet pořadí tabulek:
@@ -167,7 +167,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0],
+                                "form"                  => ["instPrf" => 0, "json" => 1],
                                 "number"                => ["instPrf" => 0]
                             ],
     "ticketSla"         =>  [   "idticketsla"           => ["instPrf" => 1, "pk" => 1],
@@ -232,7 +232,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "closed"                => ["instPrf" => 0],
                                 "unread"                => ["instPrf" => 0],
                                 "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0]
+                                "form"                  => ["instPrf" => 0, "json" => 0]
                             ],
     "crmRecordTypes"    =>  [   "idcrmrecordtype"       => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -257,7 +257,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "created"               => ["instPrf" => 0],
                                 "stage"                 => ["instPrf" => 0],
                                 "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0]
+                                "form"                  => ["instPrf" => 0, "json" => 0]
                             ],
     "crmRecordSnapshots"=>  [   "idcrmrecordsnapshot"   => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -735,11 +735,24 @@ function jsonParse ($formArr) {     // formArr je 2D-pole
         }    
     }
 }
+function jsonProcessing ($instId, $tab, $colName, $hodnota) {
+    global $jsonList;
+    if (array_key_exists($instId, $jsonList)) {
+        if (array_key_exists($tab, $jsonList[$instId])) {
+            if (array_key_exists($colName, $jsonList[$instId][$tab])) {         // sloupec obsahuje JSON
+                $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
+                if (!is_null($formArr)) {jsonParse($formArr);}                  // hodnota dekódovaného JSONu není NULL → lze ji prohledávat jako pole                
+                return $jsonList[$instId][$tab][$colName] ? true : false;       // buňka obsahovala JSON; po návratu z fce pokračovat/nepokračovat ve zpracování hodnoty
+            }
+        }
+    }
+    return true;                                                                // buňka neobsahovala JSON, po návratu z fce pokračovat ve zpracování hodnoty
+}
 function colParentTab ($instId, $tab, $colName) {                               // nalezení názvu nadřazené tabulky pro daný sloupec (je-li sloupec FK)
     global $fkList;     //echo " | count(\$fkList) = ".count($fkList);
     if (array_key_exists($instId, $fkList)) {
         if (array_key_exists($tab, $fkList[$instId])) {
-            if (array_key_exists($colName, $fkList[$instId][$tab])) {   echo " | colParentTab-returns ".$fkList[$instId][$tab][$colName];
+            if (array_key_exists($colName, $fkList[$instId][$tab])) {   //echo " | colParentTab-returns ".$fkList[$instId][$tab][$colName];
                 return $fkList[$instId][$tab][$colName];                        // daný sloupec je FK → vrátí název nadřazené tabulky
             }
         }
@@ -748,14 +761,14 @@ function colParentTab ($instId, $tab, $colName) {                               
 function integrityValid ($instId, $tab, $colName, $unprefixVal) {               // integritní validace
     global $pkVals;     //echo " | count(\$pkVals) = ".count($pkVals);
     $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK
-                        echo is_null($colParentTab) ? "" : " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab;
+                        echo is_null($colParentTab) ? "" : " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab." | ";
     if (is_null($colParentTab)) {return "notFK";}                               // daný sloupec není FK → vrátí "notFK"                                                                         
     if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
-    if (array_key_exists($colParentTab, $pkVals[$instId])) {
+        if (array_key_exists($colParentTab, $pkVals[$instId])) {
             if (in_array($unprefixVal, $pkVals[$instId][$colParentTab])) {
                 return "validFK";                                               // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
             } else {
-                logInfo("INSTANCE ".$instId.": HODNOTA ".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
+                logInfo("HODNOTA ".$instId."_".$tab.".".$colName." = ".$unprefixVal." NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
                 return "wrongFK";                                               // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
             }
         }
@@ -786,10 +799,11 @@ foreach ($instances as $instId => $inst) {
 logInfo("VSTUPNÍ SOUBORY NAČTENY");     // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");   // volitelný diagnostický výstup do logu
-/*$pkList =*/ $pkVals = $fkList = [];
+/*$pkList =*/ $pkVals = $fkList = $jsonList = [];
 /* struktura polí:  //$pkList = [$instId => [$tab => <název_PK>]]                             ... pole názvů PK pro vst. tabulky
-                    $pkVals = [$instId => [$tab => [<pole existujících hodnot PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
-                    $fkList = [$instId => [$tab => [$colName => <název_nadřazené_tabulky>]]]... pole názvů nadřazených tabulek pro každý sloupec, který je FK
+                    $pkVals   = [$instId => [$tab => [<pole existujících hodnot PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
+                    $fkList   = [$instId => [$tab => [$colName => <název_nadřazené_tabulky>]]]... pole názvů nadřazených tabulek pro každý sloupec, který je FK
+                    $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON
 */
 foreach ($instances as $instId => $inst) {                                      // iterace instancí
     logInfo("ZAHÁJENO PROHLEDÁVÁNÍ INSTANCE ".$instId);                         // volitelný diagnostický výstup do logu        
@@ -807,6 +821,10 @@ foreach ($instances as $instId => $inst) {                                      
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
+                logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]." (SLOUPEC ".$colName.")");
+            }
+            if (array_key_exists("json", $colAttrs)) {                          // nalezen sloupec, který je JSON
+                $jsonList[$instId][$tab][$colName] = $colAttrs["json"];         // uložení příznaku způsobu zpracování JSONu (0/1) do pole $jsonList                                         //
                 logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]." (SLOUPEC ".$colName.")");
             }
             $colId ++;                                                          // přechod na další sloupec            
@@ -889,30 +907,31 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
                 unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-                //$rowIntegrityOk = true;                                             // příznak integritní správnosti řádku
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                 foreach ($cols as $colName => $colAttrs) {
-                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " validace: ".$intgVld;
+                    $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
                     switch ($intgVld) {   // integritní validace pro aktuální instanci, tabulku a sloupec (= test existence odpovídajícího záznamu v nadřazené tabulce)
                         case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                         case "wrongFK": tabItemsIncr($colName, "integrErr");        // řádek nesplňuje podmínku integrity → nebude propsán do výstupní tabulky
-                                    /*$rowIntegrityOk = false;*/  continue 3;          // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
+                                    continue 3;          // další sloupce integritně nevyhovujícího řádku už není třeba prohledávat
                         case "notFK":  break;                                       // sloupec není FK
                         case "unfound":break;                                       // v poli $pkVals nenalezen některý z potřebných klíčů
                     }
                     $colId++;
                 } 
-                //if (!$rowIntegrityOk) {continue;}                                   // integritně nevyhovující řádek se dále nezpracovává (→ přechod k dalšímu řádku vst. tabulky)
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
-                
+            
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
-        /*            // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                    // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                     switch ($colAttrs["instPrf"]) {                                 // prefixace hodnoty číslem instance (je-li požadována)
                         case 0: $hodnota = $row[$colId]; break;                     // hodnota bez prefixu instance
                         case 1: $hodnota = setIdLength($instId, $row[$colId]);      // hodnota s prefixem instance
                     }
                     // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                    $afterJsonProc = jsonProcessing($instId,$tab,$colName,$hodnota);// jsonProcessing - test, zda je ve sloupci JSON; když ano, rozparsuje se
+                    if (!$afterJsonProc) {$colId++; continue;}                      // přechod na další sloupec
+          
                     switch ([$tab, $colName]) {
                         // TABULKY V5+6
                         case ["pauses", "paid"]:    $colVals[] = boolValsUnify($hodnota);                       // dvojici bool. hodnot ("",1) u v6 převede na dvojici hodnot (0,1) používanou u v5                                 
@@ -991,28 +1010,19 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     break;
                         case ["records", "action"]: $colVals[] = actionCodeToName($hodnota);    // číselný kód akce převedený na název akce
                                                     break;                                               
-                        case ["records", "form"]:   $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
-                                                    if (is_null($formArr)) {break;} // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
-                                                    jsonParse($formArr);                                         
-                                                    break;                          // sloupec "form" se nepropisuje do výstupní tabulky "records"  
-                        case [$tab,"idinstance"]:   $colVals[] = $instId;  break;   // hodnota = $instId    
+                        case [$tab,"idinstance"]:   $colVals[] = $instId;  break;               // hodnota = $instId    
                         // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------                                          
                         // TABULKY V6 ONLY
                         case ["contacts","idcontact"]:$idFieldSrcRec = $colVals[]= $hodnota;// uložení hodnoty 'idcontact' pro následné použití v 'contFieldVals'
                                                     break;
-                        case ["contacts", "form"]:  $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
-                                                    // ------------------------------------------------------------------------------------------------------------------------------------------
-                                                    // parsování "number" (veřejného tel. číslo) pro potřeby CRM records reportu
+                        case ["contacts", "form"]:  // parsování "number" (veřejného tel. číslo) pro potřeby CRM records reportu
+                                                    $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);                                                    
                                                     $telNum = "";
                                                     if (array_key_exists("number", $formArr)) {
                                                         if (array_key_exists(0, $formArr["number"])) {
                                                             $telNum = phoneNumberCanonic($formArr["number"][0]);    // uložení tel. čísla do proměnné $telNum
                                                         }                           // $contactsForm["number"] ... obecně 1D-pole, kde může být více tel. čísel → beru jen první
                                                     }
-                                                    // ------------------------------------------------------------------------------------------------------------------------------------------
-                                                    // parsování celého JSONu s hodnotami formulářových polí
-                                                    if (is_null($formArr)) {break;} // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
-                                                    jsonParse($formArr);
                                                     break;                          // sloupec "form" se nepropisuje do výstupní tabulky "contacts"  
                         case ["contacts","number"]: $colVals[] = $telNum;           // hodnota vytvořená v case ["contacts", "form"]
                                                     break;
@@ -1022,19 +1032,11 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     break;
                         case ["tickets","idstatus"]:$colVals[] = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
                                                     break;
-                        case ["tickets", "form"]:   $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
-                                                    if (is_null($formArr)) {break;} // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
-                                                    jsonParse($formArr);
-                                                    break;                          // sloupec "form" se nepropisuje do výstupní tabulky "tickets"
                         case ["crmRecords", "idcrmrecord"]:$idFieldSrcRec = $colVals[]= $hodnota;   // uložení hodnoty 'idcrmrecord' pro následné použití v 'crmFieldVals'
                                                     break;
                         case ["crmRecords", "idstatus"]:
                                                     $colVals[] = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
                                                     break;
-                        case ["crmRecords", "form"]:$formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
-                                                    if (is_null($formArr)) {break;} // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
-                                                    jsonParse($formArr);
-                                                    break;                          // sloupec "form" se nepropisuje do výstupní tabulky "crmRecords"
                         case ["crmRecordSnapshots", "idstatus"]:
                                                     $colVals[] = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
                                                     break;
@@ -1099,7 +1101,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------                                                  
                         default:                    $colVals[] = $hodnota;          // propsání hodnoty ze vstupní do výstupní tabulky bez úprav (standardní mód)
                     }
-        */            $colId++;                                                       // přechod na další sloupec (buňku) v rámci řádku                
+                    $colId++;                                                       // přechod na další sloupec (buňku) v rámci řádku                
                 }   // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------              
                 // operace po zpracování dat v celém řádku
 
@@ -1118,7 +1120,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 }
             }   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
             // operace po zpracování dat v celé tabulce
-            logInfo("DOKONČENO ZPRACOVÁNÍ TABULKY ".$tab." Z INSTANCE ".$instId);   // volitelný diagnostický výstup do logu
+            logInfo("DOKONČENO ZPRACOVÁNÍ TABULKY ".$instId."_".$tab);              // volitelný diagnostický výstup do logu
             if (empty($tabItems)) {continue;}                                       // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
             logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:");
             foreach ($tabItems as $colName => $colCounts) {      logInfo("\$tabItems[".$colName."]: ");  print_r($colCounts);
