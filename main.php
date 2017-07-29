@@ -14,7 +14,7 @@ $config     = json_decode(file_get_contents($configFile), true);
 // parametry importované z konfiguračního JSON v KBC
 $integrityValidationOn  = $config["parameters"]["integrityValidationOn"];
 $callsIncrementalOutput = $config["parameters"]["callsIncrementalOutput"];
-$diagOutOptions         = $config["parameters"]["diagOutOptions"];          // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, detailIntegrInfo
+$diagOutOptions         = $config["parameters"]["diagOutOptions"];          // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, basicIntegrInfo, detailIntegrInfo
 $adhocDump              = $config["parameters"]["adhocDump"];               // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
 
 // full load / incremental load výstupní tabulky 'calls'
@@ -168,7 +168,7 @@ $tabsInOutV56_part2 = [
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
                                 "idcall"                =>  ["instPrf" => 1/*, "fk" => "calls"*/],
                                 "created"               =>  ["instPrf" => 0],
-                                "created_by"            =>  ["instPrf" => 1],
+                                "created_by"            =>  ["instPrf" => 1],                           // neuvažujeme jako FK do "users" (není to tak v GD)
                                 "nextcall"              =>  ["instPrf" => 0]
                             ]
 ];
@@ -673,7 +673,9 @@ function initFields () {                // nastavení výchozích hodnot proměn
 }
 function iterStatuses ($val, $valType = "statusIdOrig") {               // prohledání 3D-pole stavů $statuses
     global $statuses, $emptyToNA, $fakeId;                              // $val = hledaná hodnota;  $valType = "title" / "statusIdOrig"
-    if ($emptyToNA && empty($val)) {return $fakeId;}                    // hodnota FK je sice prázdná, ale bude nahrazena hodnotou $fakeId (typicky "n/a")
+    if ($valType=="statusIdOrig" && $emptyToNA && $val==$fakeId) {
+        return $fakeId;                                                 // původně prázdná hodnota FK je nahrazena hodnotou $fakeId (typicky "n/a")
+    }
     foreach ($statuses as $statId => $statRow) {
         switch ($valType) {
             case "title":           // $statRow[$valType] je string
@@ -884,9 +886,10 @@ foreach ($instances as $instId => $inst) {                                      
         $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)
         $pkValsTabCnt = count($pkVals[$instId][$tab]);                          // počet unikátních hodnot PK pro danou tabulku  
         checkIdLengthOverflow($pkValsTabCnt);                                   // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
-        logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");
-            logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ");  print_r(array_slice($pkVals[$instId][$tab], 0, 100));
-            if($pkValsTabCnt > 100) {logInfo("[zkrácený výpis]");}
+        logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");                       // diagnostické výstupy do logu
+        logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
+        if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, 100));}
+        if($pkValsTabCnt > 100) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
     }
 }
 logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");
@@ -949,7 +952,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {                // načítání řádků vstupních tabulek [= iterace řádků]
                 if ($rowNum == 0) {continue;}                                       // vynechání hlavičky tabulky
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
-                unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
+                unset($idFieldSrcRec, $idqueue, $iduser, $type);                    // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                 // integritní validace hodnot v aktuálním řádku [pro aktuální instanci, tabulku a sloupec] (= test existence odpovídajícího záznamu v nadřazené tabulce)
                 if ($integrityValidationOn) {
@@ -1053,8 +1056,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     break;                                      // sloupec "name" se nepropisuje do výstupní tabulky "fields"                
                         case ["records","idrecord"]:$idFieldSrcRec = $colVals[] = $hodnota;     // uložení hodnoty 'idrecord' pro následné použití ve 'fieldValues'
                                                     break;
-                        case ["records","idstatus"]:$idstat = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
-                                                    $colVals[] = $idstat;
+                        case ["records","idstatus"]:$colVals[] = $commonStatuses ? setIdLength(0, iterStatuses($hodnota), false) : $hodnota;
                                                     break;
                         case ["records", "number"]: $colVals[] = phoneNumberCanonic($hodnota);  // veřejné tel. číslo v kanonickém tvaru (bez '+')
                                                     break;
@@ -1173,7 +1175,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             
             if (!$integrityValidationOn) {continue;}                                // není prováděna integritní validace → přechod k další tabulce  
             if (empty($tabItems)) {continue;}                                       // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
-            logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:");
+            logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:", "basicIntegrInfo");
             foreach ($tabItems as $colName => $colCounts) {      logInfo("\$tabItems[".$colName."]: ");  print_r($colCounts);
                 $colOk  = $colCounts["integrOk"];
                 $colFak = $colCounts["integrFak"];
@@ -1183,9 +1185,9 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentFak = $colSum > 0 ? round($colFak/$colSum *100 , 1) : "--"; // procento integritně správných hodnot v tabulce po náhrafě prázdných hodnot FK hodnotou $fakeId
                 $percentErr = $colSum > 0 ? round($colErr/$colSum *100 , 1) : "--"; // procento integritně chybných hodnot v tabulce
                 switch ($colName) {
-                    case "total":   logInfo("CELKEM: ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");
+                    case "total":   logInfo("CELKEM: ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)", "basicIntegrInfo");
                                     break;                  
-                    default:        logInfo("SLOUPEC ".$colName.": ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)");  
+                    default:        logInfo("SLOUPEC ".$colName.": ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)", "basicIntegrInfo");  
                 }
             }            
         }
