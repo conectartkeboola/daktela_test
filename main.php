@@ -38,9 +38,9 @@ $incremHistDays = $incrementalOn && !empty($jsonHistDays) && is_numeric($jsonHis
 // proměnné a konstanty
 
 // seznam instancí Daktela
-$instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5]//,
+$instances = [  //1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
               //  2   =>  ["url" => "https://dircom.daktela.com",     "ver" => 5],
-              //  3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
+                3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
 ];
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // struktura tabulek
@@ -110,7 +110,7 @@ $tabsInOutV56 = [
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "idgroup"               =>  ["instPrf" => 1/*, "fk" => "groups"*/]
+                                "idgroup"               =>  ["instPrf" => 1, "fk" => "groups"]
                             ],                              // 'idgroup' je v IN tabulce NÁZEV → neprefixovat
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0]
@@ -907,6 +907,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
                 unset($idFieldSrcRec, $idstat, $idqueue, $iduser, $type);           // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID stavů, front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                // integritní validace hodnot v aktuálním řádku
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                 foreach ($cols as $colName => $colAttrs) {
                     $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]); echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
@@ -920,6 +921,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                     $colId++;
                 } 
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                
+                // zpracování hodnot v aktuálním řádku
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
             
                 foreach ($cols as $colName => $colAttrs) {                          // konstrukce řádku výstupní tabulky (vložení hodnot řádku) [= iterace sloupců]                    
