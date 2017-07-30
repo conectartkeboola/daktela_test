@@ -480,7 +480,7 @@ $instCommonOuts = ["statuses" => 1, "groups" => 1, "fieldValues" => 1];
 // motivace:  pro joinování tabulek v GD (tam se prázdná hodnota defaultně označuje jako "(empty value)")
 $emptyToNA   = true;
 $fakeId      = "n/a";
-$fakeTitle   = "(empty value)";
+$fakeTitle   = "";                                          // původně "(empty value)"
 $tabsFakeRow = $tabsList_InOut[5] + $tabsList_InOut[6];     // = všechny InOut tabulky (sjednocení) napříč verzemi (původně jen ["users", "statuses"])
 
 // počty číslic, na které jsou doplňovány ID's (kvůli řazení v GoodData je výhodné mít konst. délku ID's) a oddělovač prefixu od hodnoty
@@ -1185,9 +1185,15 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentFak = $colSum > 0 ? round($colFak/$colSum *100 , 1) : "--"; // procento integritně správných hodnot v tabulce po náhrafě prázdných hodnot FK hodnotou $fakeId
                 $percentErr = $colSum > 0 ? round($colErr/$colSum *100 , 1) : "--"; // procento integritně chybných hodnot v tabulce
                 switch ($colName) {
-                    case "total":   logInfo("CELKEM: ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)", "basicIntegrInfo");
+                    case "total":   logInfo(" - TABULKA ".$instId."_".$tab." CELKEM:", "basicIntegrInfo"); 
+                                    logInfo("  -- ".$colOk. " / ".$colSum." (".$percentOk. "%) ZÁZNAMŮ INTEGRITNĚ OK", "basicIntegrInfo"); 
+                                    logInfo("  -- ".$colFak." / ".$colSum." (".$percentFak."%) ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK", "basicIntegrInfo");
+                                    logInfo("  -- ".$colErr." / ".$colSum." (".$percentErr."%) ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE", "basicIntegrInfo");                                    
                                     break;                  
-                    default:        logInfo("SLOUPEC ".$colName.": ".$colOk."/".$colSum." ZÁZNAMŮ INTEGRITNĚ OK (".$percentOk."%), ".$colFak."/".$colSum." ZÁZNAMŮ S INTEGRITOU UMĚLÝM PK-FK (".$percentFak."%), ".$colErr."/".$colSum." BEZ ZÁZNAMU V NADŘAZENÉ TABULCE (".$percentErr."%)", "basicIntegrInfo");  
+                    default:        logInfo(" - ATRIBUT ".$instId."_".$tab.".".$colName.": ", "basicIntegrInfo");  
+                                    logInfo("  -- ".$colOk. " / ".$colSum." (".$percentOk. "%) ZÁZNAMŮ INTEGRITNĚ OK", "basicIntegrInfo");  
+                                    logInfo("  -- ".$colFak." / ".$colSum." (".$percentFak."%) ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK", "basicIntegrInfo");
+                                    logInfo("  -- ".$colErr." / ".$colSum." (".$percentErr."%) ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE", "basicIntegrInfo");  
                 }
             }            
         }
