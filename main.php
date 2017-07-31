@@ -34,21 +34,23 @@ foreach ($instances as $instId => $inst) {                                      
     foreach ($tabs_InOut_InOnly[$inst["ver"]] as $tab => $cols) {               // iterace tabulek; $tab - název tabulky, $cols - pole s parametry sloupců
         logInfo("NAČÍTÁNÍ DEFINICE TABULKY ".$instId."_".$tab);                 // volitelný diagnostický výstup do logu   
         
-        $colId = 0;                                                             // počitadlo sloupců (číslováno od 0)
-        $pkColId = NULL;                                                        // ID sloupce, který je pro danou tabulku PK (číslováno od 0; NULL - PK nenelezen)
+        $colId   = 0;                                                           // počitadlo sloupců (číslováno od 0)
+        $pkColId = NULL;                                                        // ID sloupce, který je v dané tabulce PK (číslováno od 0; NULL - PK nenelezen)
+        $tiColId = NULL;                                                        // ID sloupce, který je v dané tabulce atributem pro datumovou restrikci (číslováno od 0)
         foreach ($cols as $colName => $colAttrs) {                              // iterace sloupců
             if (array_key_exists("json", $colAttrs)) {                          // nalezen sloupec, který je JSON
                 $jsonList[$instId][$tab][$colName] = $colAttrs["json"];         // uložení příznaku způsobu zpracování JSONu (0/1) do pole $jsonList                                         //
                 logInfo("TABULKA ".$instId."_".$tab." - NALEZEN JSON ".$colName."; DALŠÍ ZPRACOVÁNÍ PO PARSOVÁNÍ = ".$colAttrs["json"]);
             }
-            if (array_key_exists("ti", $colAttrs)) {                            // nalezen sloupec, který je atributem pro časovou restrikci záznamů
-                $tiList[$instId][$tab] = $colId;                                // uložení indexu sloupce (0, 1, 2, ...) do pole $tiList                                         //
-                logInfo("TABULKA ".$instId."_".$tab." - ATRIBUT PRO ČASOVOU RESTRIKCI ZÁZNAMŮ: SLOUPEC #".$colId." (".$colName.")");
-            }
             if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
                 //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
                 $pkColId = $colId;
                 logInfo("TABULKA ".$instId."_".$tab." - PK NALEZEN (SLOUPEC #".$pkColId.")");
+            }
+            if (array_key_exists("ti", $colAttrs)) {                            // nalezen sloupec, který je atributem pro časovou restrikci záznamů
+                $tiColId = $colId;
+                $tiList[$instId][$tab] = $colId;                                // uložení indexu sloupce (0, 1, 2, ...) do pole $tiList                                         //
+                logInfo("TABULKA ".$instId."_".$tab." - ATRIBUT PRO ČASOVOU RESTRIKCI ZÁZNAMŮ: SLOUPEC #".$colId." (".$colName.")");
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
                 $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList
@@ -65,6 +67,9 @@ foreach ($instances as $instId => $inst) {                                      
             logInfo("TABULKA ".$instId."_".$tab." - PROHLEDÁVÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + ÚDAJE PRO INTEGRITNÍ VALIDACI)");  // volitelný diagnostický výstup do logu
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {            // iterace řádků vst. tabulek; $rowNum - ID řádku, $row - pole hodnot
                 if ($rowNum == 0) {continue;}                                   // vynechání hlavičky tabulky
+                if (!is_null($tiColId)) {                                       // pro danou tabulku je znám ID sloupce představujícího atribut pro datumovou restrikci
+                    if (!timeRngCheck($row[$tiColId], "pkVals")) {continue;}    // hodnota atributu pro datumovou restrikci leží mimo požadovaný datumový rozsah → hodnota PK se neuloží, přechod na další řádek            
+                }
                 $pkVals[$instId][$tab][] = $row[$pkColId];                      // uložení hodnoty PK do pole $pkVals
             }
             $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)

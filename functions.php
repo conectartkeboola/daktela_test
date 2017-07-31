@@ -191,12 +191,14 @@ function iterStatuses ($val, $valType = "statusIdOrig") {               // prohl
     return false;                   // zadaná hodnota v poli $statuses nenalezena
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function timeRngCheck ($val) {      // $val je datumočas ze zkoumaného záznamu
-    global $incrementalOn, $histDays;
-    $startDate = date("Y-m-d", strtotime(-$histDays['start']." days")); // počáteční datum zpracováváného rozsahu
-    $endDate   = date("Y-m-d", strtotime(-$histDays['end']  ." days")); // koncové datum zpracovávaného rozsahu
+function timeRngCheck ($val, $type = "tabRow") {                        // $val je datumočas ze zkoumaného záznamu
+    global $incrementalOn, $processedDates, $pkValsProcessedDates;
+    switch ($type) {
+        case "tabRow":  $dateRng = $processedDates; break;              // pro validaci datumového rozsahu záznamů při zpracovávání záznamů
+        case "pkVals":  $dateRng = $pkValsProcessedDates;               // pro validaci datumového rozsahu záznamů při sbírání hodnot PK do pole $pkVals
+    }
     $rowDate   = substr($val, 0, 10);                                   // datum ze zkoumaného záznamu
-    return ($incrementalOn && ($rowDate < $startDate || $rowDate > $endDate)) ? false : true;
+    return ($incrementalOn && ($rowDate < $dateRng["start"] || $rowDate > $dateRng["end"])) ? false : true;
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function emptyToNA ($id) {          // prázdné hodnoty nahradí hodnotou $fakeId - kvůli GoodData, aby zde byla nabídka $fakeTitle [volitelné]

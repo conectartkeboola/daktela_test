@@ -1,6 +1,22 @@
 <?php
 // proměnné a konstanty
 
+// datumový rozsah zpracování
+$processedDates     =   [   "start" =>  date("Y-m-d", strtotime(-$histDays['start']." days")),  // počáteční datum zpracováváného rozsahu
+                            "end"   =>  date("Y-m-d", strtotime(-$histDays['end']  ." days"))       // koncové datum zpracovávaného rozsahu
+                        ];
+
+// počet dní, o které je rozšířen rozsah $processedDates pro načtení hodnot PK do pole $pkVals (použije se při integritní validaci)
+$pkValsReserveDays  =   [   "start" =>  60,
+                            "end"   => 5
+                        ];
+$pkValsHistDays     =   [   "start" =>  $histDays["start"] + $pkValsReserveDays["start"], 
+                            "end"   =>  $histDays["end"]   + $pkValsReserveDays["end"]
+                        ];
+$pkValsProcessedDates = [   "start" =>  date("Y-m-d", strtotime(-$pkValsHistDays['start']." days")),
+                            "end"   =>  date("Y-m-d", strtotime(-$pkValsHistDays['end']  ." days"))
+                        ];
+
 // seznam instancí Daktela
 $instancesList = [  "1" =>  ["url" => "https://ilinky.daktela.com",       "ver" => 5],
                     "2" =>  ["url" => "https://dircom.daktela.com",       "ver" => 5],
