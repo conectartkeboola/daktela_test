@@ -57,7 +57,7 @@ foreach ($instances as $instId => $inst) {                                      
         }                                                                       // ... přejde se rovnou na další tabulku
         // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
         if ($integrityValidationOn) {                                           // shromáždění hodnot PK z dané tabulky
-            logInfo("ZAHÁJENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");       // volitelný diagnostický výstup do logu
+            logInfo("TABULKA ".$instId."_".$tab." - PROHLEDÁVÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + ÚDAJE PRO INTEGRITNÍ VALIDACI)");  // volitelný diagnostický výstup do logu
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {            // iterace řádků vst. tabulek; $rowNum - ID řádku, $row - pole hodnot
                 if ($rowNum == 0) {continue;}                                   // vynechání hlavičky tabulky
                 $pkVals[$instId][$tab][] = $row[$pkColId];                      // uložení hodnoty PK do pole $pkVals
@@ -67,8 +67,8 @@ foreach ($instances as $instId => $inst) {                                      
             checkIdLengthOverflow($pkValsTabCnt);                               // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
             logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");                       // diagnostické výstupy do logu
             logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
-            if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, 100));}
-            if($pkValsTabCnt > 100) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
+            if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, $pkSampleCount));}          // $pkSampleCount - počet hodnot PK vypsaných na ukázku do logu
+            if($pkValsTabCnt > $pkSampleCount) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
         }
         // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     }

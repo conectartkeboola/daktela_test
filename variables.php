@@ -456,6 +456,9 @@ $idFormat = [
     "idField"   =>  3                                       // výchozí počet číslic, na které je doplňováno inkrementální ID hodnot konkrétního form. pole
 ];
 
+// počet hodnot PK vypsaných na ukázku do logu (při zapnuté integritní validaci)
+$pkSampleCount = 15;
+
 // delimitery názvu skupiny v queues.idgroup
 $delim = [ "L" => "[[" , "R" => "]]" ];
 

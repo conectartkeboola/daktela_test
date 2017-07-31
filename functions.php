@@ -326,7 +326,7 @@ function integrityValid ($instId, $tab, $colName, $unprefixVal) {               
 function tabItemsIncr ($colName, $integrValidResult) {                          // inkrement počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci
     global $integrValidCounts;                                                  // $integrValidResult = "integrOk" / "integrFak" / "integrErr"
     // test existence potřebných počitadel v poli $integrValidCounts, založení chybějících počitadel s nulovou hodnotou
-    if(!array_key_exists($colName, $integrValidCountss))             {$integrValidCounts[$colName] = [];}
+    if(!array_key_exists($colName, $integrValidCounts))              {$integrValidCounts[$colName] = [];}
     if(!array_key_exists("total" , $integrValidCounts))              {$integrValidCounts["total"]  = [];}
     if(!array_key_exists("integrOk" , $integrValidCounts[$colName])) {$integrValidCounts[$colName]["integrOk"] = 0;}  
     if(!array_key_exists("integrFak", $integrValidCounts[$colName])) {$integrValidCounts[$colName]["integrFak"]= 0;}
