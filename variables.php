@@ -2,10 +2,18 @@
 // proměnné a konstanty
 
 // seznam instancí Daktela
-$instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
-                2   =>  ["url" => "https://dircom.daktela.com",     "ver" => 5],
-                3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
+$instancesList = [  "1" =>  ["url" => "https://ilinky.daktela.com",       "ver" => 5],
+                    "2" =>  ["url" => "https://dircom.daktela.com",       "ver" => 5],
+                    "3" =>  ["url" => "https://conectart.daktela.com",    "ver" => 6],
+                    "4" =>  ["url" => "https://conectart-in.daktela.com", "ver" => 6]
 ];
+// z pole $instancesList se do pole $instances vyberou jen definice instancí, které mají v konfiguračním JSONu zapnuté zpracování:
+$instances = [];
+foreach ($instancesList as $instId => $instAttrs) {     // $instId = "1", "2", ... (typ STRING - vyžaduje to konfigurační JSON v KBC)
+    if (!empty($processedInstances[$instId])) {         // vstupní hodnota false se vyhodnotí jako empty :)
+        $instances[(int)$instId] = $instAttrs;          // (int) ... výstupní pole $instances má klíče číslované typem INT
+    }    
+}
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // struktura tabulek
 
@@ -28,8 +36,8 @@ $instances = [  1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
 
 // vstupně-výstupní tabulky (načtou se jako vstupy, transformují se a výsledek je zapsán jako výstup)
 
-// // "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName),
-//           "json" - jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty (0/1)]
+// "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName),
+//           "json" - jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty (0/1), "ti" - parametr pro časovou restrikci záznamů]
 
 $tabsInOutV56_part1 = [
     // skupina 1 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -60,20 +68,20 @@ $tabsInOutV56_part1 = [
                             ],
     // skupina 3 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0],
+                                "start_time"            =>  ["instPrf" => 0, "ti" => 1],
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
     "pauseSessions"     =>  [   "idpausesession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0],
+                                "start_time"            =>  ["instPrf" => 0, "ti" => 1],
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
                                 "idpause"               =>  ["instPrf" => 0, "fk" => "pauses"],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
     "queueSessions"     =>  [   "idqueuesession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0], 
+                                "start_time"            =>  ["instPrf" => 0, "ti" => 1], 
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
                                 "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
@@ -83,7 +91,7 @@ $tabsInOutV56_part1 = [
 $tabsInOutV5  = [
     // skupina 3 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
-                                "call_time"             =>  ["instPrf" => 0],
+                                "call_time"             =>  ["instPrf" => 0, "ti" => 1],
                                 "direction"             =>  ["instPrf" => 0],
                                 "answered"              =>  ["instPrf" => 0],
                                 "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
@@ -119,7 +127,7 @@ $tabsInOutV56_part2 = [
                                 "number"                =>  ["instPrf" => 0],
                                 "idcall"                =>  ["instPrf" => 1],
                                 "action"                =>  ["instPrf" => 0],
-                                "edited"                =>  ["instPrf" => 0],
+                                "edited"                =>  ["instPrf" => 0, "ti" => 1],
                                 "created"               =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],
                                 "form"                  =>  ["instPrf" => 0, "json" => 0]               // "json" => <0/1> ~ jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty
@@ -130,7 +138,7 @@ $tabsInOutV56_part2 = [
                                 "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
                                 "idcall"                =>  ["instPrf" => 1],
-                                "created"               =>  ["instPrf" => 0],
+                                "created"               =>  ["instPrf" => 0, "ti" => 1],
                                 "created_by"            =>  ["instPrf" => 1],                           // neuvažujeme jako FK do "users" (není to tak v GD)
                                 "nextcall"              =>  ["instPrf" => 0]
                             ]
@@ -163,7 +171,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "title"                 => ["instPrf" => 0],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0],
+                                "created"               => ["instPrf" => 0, "ti" => 1],
                                 "idinstance"            => ["instPrf" => 0]
                             ],
     // skupina 7 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -226,7 +234,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "reopen"                => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "created"               => ["instPrf" => 0],
-                                "edited"                => ["instPrf" => 0],
+                                "edited"                => ["instPrf" => 0, "ti" => 1],
                                 "edited_by"             => ["instPrf" => 1],
                                 "first_answer"          => ["instPrf" => 0],
                                 "first_answer_duration" => ["instPrf" => 0],
@@ -247,7 +255,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "idstatus"              => ["instPrf" => 1, "fk" => "idstatus"],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "edited"                => ["instPrf" => 0],
+                                "edited"                => ["instPrf" => 0, "ti" => 1],
                                 "created"               => ["instPrf" => 0],
                                 "stage"                 => ["instPrf" => 0],
                                 "idinstance"            => ["instPrf" => 0],
@@ -266,7 +274,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "type"                  => ["instPrf" => 0],
                                 "priority"              => ["instPrf" => 0],
                                 "description"           => ["instPrf" => 0],
-                                "time"                  => ["instPrf" => 0],
+                                "time"                  => ["instPrf" => 0, "ti" => 1],
                                 "time_wait"             => ["instPrf" => 0],
                                 "time_open"             => ["instPrf" => 0],
                                 "time_close"            => ["instPrf" => 0],
@@ -288,7 +296,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "created_by"            => ["instPrf" => 0],
-                                "time"                  => ["instPrf" => 0],
+                                "time"                  => ["instPrf" => 0, "ti" => 1],
                                 "stage"                 => ["instPrf" => 0],
                                 "idinstance"            => ["instPrf" => 0]
                             ]

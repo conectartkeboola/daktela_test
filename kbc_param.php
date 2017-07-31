@@ -5,23 +5,34 @@ $configFile = $dataDir."config.json";
 $config     = json_decode(file_get_contents($configFile), true);
 
 // parametry importované z konfiguračního JSON v KBC
-$integrityValidationOn  = $config["parameters"]["integrityValidationOn"];
-$callsIncrementalOutput = $config["parameters"]["callsIncrementalOutput"];
-$diagOutOptions         = $config["parameters"]["diagOutOptions"];          // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, basicIntegrInfo, detailIntegrInfo
-$adhocDump              = $config["parameters"]["adhocDump"];               // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
+$confParam = $config["parameters"];
+$integrityValidationOn  = $confParam["integrityValidationOn"];
+$processedInstances     = $confParam["processedInstances"]; // pole s údaji, které instance mají být zpracovány - např. ["1" => true, "2" => true, ...]
+$incrementalMode        = $confParam["incrementalMode"];
+$diagOutOptions         = $confParam["diagOutOptions"];     // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, basicIntegrInfo, detailIntegrInfo
+$adhocDump              = $confParam["adhocDump"];          // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
 
-// full load / incremental load výstupní tabulky 'calls'
-$incrementalOn = !empty($callsIncrementalOutput['incrementalOn']) ? true : false;   // vstupní hodnota false se vyhodnotí jako empty :)
+// parametry inkrementálního režimu
+$incrementalOn = empty($incrementalMode['incrementalOn']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
+$incrCallsOnly = empty($incrementalMode['incrCallsOnly']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
+$histDays      = $incrementalMode['histDays'];              // datum. rozsah historie pro tvorbu reportu - pole má klíče "start" a "end", kde musí být "start" >= "end"
 
-// za jak dlouhou historii [dny] se generuje inkrementální výstup (0 = jen za aktuální den, 1 = od včerejšího dne včetně [default], ...)
-$jsonHistDays   = $callsIncrementalOutput['incremHistDays'];
-$incremHistDays = $incrementalOn && !empty($jsonHistDays) && is_numeric($jsonHistDays) ? $jsonHistDays : 1;
 /* import parametru z JSON řetězce v definici Customer Science PHP v KBC:
     {
       "integrityValidationOn": true,
-      "callsIncrementalOutput": {
+      "incrementalMode": {
         "incrementalOn": false,
-        "incremHistDays": 1200
+        "incrCallsOnly": false,
+        "histDays": {
+          "start": 1200,
+          "end":   1150
+        }
+      },
+      "processedInstances": {
+        "1": true,
+        "2": true,
+        "3": true,
+        "4": false
       },
       "diagOutOptions": {
         "basicStatusInfo": true,
@@ -35,4 +46,7 @@ $incremHistDays = $incrementalOn && !empty($jsonHistDays) && is_numeric($jsonHis
       }
    }
   -> podrobnosti viz https://developers.keboola.com/extend/custom-science
+
+!!!  UPOZORNĚNÍ: 
+je-li zapnuto "integrityValidationOn", je nutné použít inkremenální režim s obezřetně voleným datum. rozsahem, jinak custom science skončí po 6 hodinách (dat je moc)
 */

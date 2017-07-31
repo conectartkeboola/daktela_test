@@ -182,8 +182,8 @@ function iterStatuses ($val, $valType = "statusIdOrig") {               // prohl
                                     break;
             case "statusIdOrig":    // $statRow[$valType] je 1D-pole
                                     foreach ($statRow[$valType] as $statVal) {
-                                        if ($statVal == $val) {     // zadaná hodnota v poli $statuses nalezena
-                                            return $statId;         // ... → vrátí id (umělé) položky pole $statuses, v níž se hodnota nachází
+                                        if ($statVal == $val) {         // zadaná hodnota v poli $statuses nalezena
+                                            return $statId;             // ... → vrátí id (umělé) položky pole $statuses, v níž se hodnota nachází
                                         }
                                     }
         }        
@@ -191,13 +191,12 @@ function iterStatuses ($val, $valType = "statusIdOrig") {               // prohl
     return false;                   // zadaná hodnota v poli $statuses nenalezena
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function callTimeRngCheck ($val) {
-    global $incrementalOn, $incremHistDays; 
-    if ($incrementalOn &&           // je-li u tabulky 'calls' požadován jen inkrementální výstup (hovory novější než...) ...
-        substr($val, 0, 10) < date("Y-m-d", strtotime(-$incremHistDays." days"))) { // ... pak je-li daný hovor starší než... ($val je datumočas) ...   
-            return false;
-    }        
-    return true;
+function timeRngCheck ($val) {      // $val je datumočas ze zkoumaného záznamu
+    global $incrementalOn, $histDays;
+    $startDate = date("Y-m-d", strtotime(-$histDays['start']." days")); // počáteční datum zpracováváného rozsahu
+    $endDate   = date("Y-m-d", strtotime(-$histDays['end']  ." days")); // koncové datum zpracovávaného rozsahu
+    $rowDate   = substr($val, 0, 10);                                   // datum ze zkoumaného záznamu
+    return ($incrementalOn && ($rowDate < $startDate || $rowDate > $endDate)) ? false : true;
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function emptyToNA ($id) {          // prázdné hodnoty nahradí hodnotou $fakeId - kvůli GoodData, aby zde byla nabídka $fakeTitle [volitelné]

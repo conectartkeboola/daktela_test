@@ -21,8 +21,9 @@ foreach ($instances as $instId => $inst) {
 logInfo("VSTUPNÍ SOUBORY NAČTENY");     // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO NAČÍTÁNÍ DEFINICE DATOVÉHO MODELU");                          // volitelný diagnostický výstup do logu
-$jsonList = $pkVals = $fkList = [];
+$jsonList = $tiList = $pkVals = $fkList = [];
 /* struktura polí:  $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON
+                    $tiList   = [$instId => [$tab => <název_časového_atributu>]]              ... pole indexů sloupců pro časovou restrikci záznamů
                     //$pkList = [$instId => [$tab => <název_PK>]]                             ... pole názvů PK pro vst. tabulky
                     $pkVals   = [$instId => [$tab => [<pole existujících hodnot PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
                     $fkList   = [$instId => [$tab => [$colName => <název_nadřazené_tabulky>]]]... pole názvů nadřazených tabulek pro každý sloupec, který je FK
@@ -39,6 +40,10 @@ foreach ($instances as $instId => $inst) {                                      
             if (array_key_exists("json", $colAttrs)) {                          // nalezen sloupec, který je JSON
                 $jsonList[$instId][$tab][$colName] = $colAttrs["json"];         // uložení příznaku způsobu zpracování JSONu (0/1) do pole $jsonList                                         //
                 logInfo("TABULKA ".$instId."_".$tab." - NALEZEN JSON ".$colName."; DALŠÍ ZPRACOVÁNÍ PO PARSOVÁNÍ = ".$colAttrs["json"]);
+            }
+            if (array_key_exists("ti", $colAttrs)) {                            // nalezen sloupec, který je atributem pro časovou restrikci záznamů
+                $tiList[$instId][$tab] = $colId;                                // uložení indexu sloupce (0, 1, 2, ...) do pole $tiList                                         //
+                logInfo("TABULKA ".$instId."_".$tab." - ATRIBUT PRO ČASOVOU RESTRIKCI ZÁZNAMŮ: SLOUPEC #".$colId." (".$colName.")");
             }
             if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
                 //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
@@ -140,7 +145,13 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             // iterace řádků dané tabulky -------------------------------------------------------------------------------------------------------------------------------------------------------
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {                // načítání řádků vstupních tabulek [= iterace řádků]
                 if ($rowNum == 0) {continue;}                                       // vynechání hlavičky tabulky
-                
+                // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                // při inkrementáním módu pro všechny nestatické tabulky (tj. nejen "calls" a "activities") přeskočení záznamů ležících mimo zpracovávaný datumový rozsah 
+                if (!$incrCallsOnly) {                                              // inkrementálně zpracováváme všechny nestatické tabulky, nejen "calls" a "activities"
+                    $timeColId = $tiList[$instId][$tab];                            // index sloupce, který je v dané tabulce atributem pro datumovou restrikci (0, 1, 2, ...)
+                    if (!timeRngCheck($row[$timeColId])) {continue;}                // hodnota atributu pro datumovou restrikci leží mimo zpracovávaný datumový rozsah → přechod na další řádek                
+                } 
+                // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                 $tabItems[$tab]++;                                                  // inkrement počitadla záznamů v tabulce
                 if (checkIdLengthOverflow($tabItems[$tab])) {                       // došlo k přetečení délky ID určené proměnnou $idFormat["idTab"]
                     continue 4;                                                     // zpět na začátek cyklu 'while' (začít plnit OUT tabulky znovu, s delšími ID)
@@ -204,7 +215,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     }                                                
                                                     $colVals[] = $idGroupFormated;                              // vložení formátovaného ID skupiny jako prvního prvku do konstruovaného řádku 
                                                     break;
-                        case ["calls", "call_time"]:if (!callTimeRngCheck($hodnota)) {                          // 'call_time' není z požadovaného rozsahu -> ...
+                        case ["calls", "call_time"]:if (!timeRngCheck($hodnota)) {                              // 'call_time' není z požadovaného rozsahu -> ...
                                                         continue 3;                                             // ... řádek z tabulky 'calls' přeskočíme
                                                     } else {                                                    // 'call_time' je z požadovaného rozsahu -> ...
                                                         $colVals[] = $hodnota; break;                           // ... 'call_time' použijeme a normálně pokračujeme v konstrukci řádku...
@@ -305,7 +316,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     if (is_null($item)) {break;}    // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
 
                                                     // příprava hodnot do řádku výstupní tabulky 'calls':
-                                                    if (!callTimeRngCheck($item["call_time"])) {continue 3;} // 'call_time' není z požadovaného rozsahu -> řádek z tabulky 'activities' přeskočíme
+                                                    if (!timeRngCheck($item["call_time"])) {continue 3;}    // 'call_time' není z požadovaného rozsahu -> řádek z tabulky 'activities' přeskočíme
 
                                                     $callsVals = [  $item["id_call"],                       // konstrukce řádku výstupní tabulky 'calls'
                                                                     $item["call_time"],
@@ -382,13 +393,13 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentFak = $colSum > 0 ? round($colFak/$colSum *100 , 1) : "--"; // procento integritně správných hodnot v tabulce po náhrafě prázdných hodnot FK hodnotou $fakeId
                 $percentErr = $colSum > 0 ? round($colErr/$colSum *100 , 1) : "--"; // procento integritně chybných hodnot v tabulce
                 switch ($colName) {
-                    case "total":   logInfo("- TABULKA ".$instId."_".$tab." CELKEM:", "basicIntegrInfo"); break;                  
-                    default:        logInfo("- ATRIBUT ".$instId."_".$tab.".".$colName.": ", "basicIntegrInfo");                                    
+                    case "total":   logInfo("-- TABULKA ".$instId."_".$tab." CELKEM:", "basicIntegrInfo"); break;                  
+                    default:        logInfo("-- ATRIBUT ".$instId."_".$tab.".".$colName.": ", "basicIntegrInfo");                                    
                 }
-                logInfo("-- " .$colSum." ZÁZNAMŮ CELKEM, Z TOHO",                                       "basicIntegrInfo");  
-                logInfo("--- ".$colOk. " (".$percentOk. "%) INTEGRITNĚ OK",                             "basicIntegrInfo");  
-                logInfo("--- ".$colFak." (".$percentFak."%) S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK",      "basicIntegrInfo");
-                logInfo("--- ".$colErr." (".$percentErr."%) S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE", "basicIntegrInfo");  
+                logInfo("---- " .$colSum." ZÁZNAMŮ CELKEM, Z TOHO",                                          "basicIntegrInfo");  
+                logInfo("-------- ".$colOk. " (".$percentOk. "%) INTEGRITNĚ OK",                             "basicIntegrInfo");  
+                logInfo("-------- ".$colFak." (".$percentFak."%) S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK",      "basicIntegrInfo");
+                logInfo("-------- ".$colErr." (".$percentErr."%) S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE", "basicIntegrInfo");  
             }            
         }
         logInfo("DOKONČENO ZPRACOVÁNÍ INSTANCE ".$instId);                      // volitelný diagnostický výstup do logu
