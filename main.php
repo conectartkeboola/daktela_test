@@ -3,835 +3,13 @@
 
 require_once "vendor/autoload.php";
 
-// načtení konfiguračního souboru
-$ds         = DIRECTORY_SEPARATOR;
-$dataDir    = getenv("KBC_DATADIR");
+$ds      = DIRECTORY_SEPARATOR;
+$dataDir = getenv("KBC_DATADIR");
+$homeDir = __DIR__;
 
-// pro případ importu parametrů zadaných JSON kódem v definici PHP aplikace v KBC
-$configFile = $dataDir."config.json";
-$config     = json_decode(file_get_contents($configFile), true);
-
-// parametry importované z konfiguračního JSON v KBC
-$integrityValidationOn  = $config["parameters"]["integrityValidationOn"];
-$callsIncrementalOutput = $config["parameters"]["callsIncrementalOutput"];
-$diagOutOptions         = $config["parameters"]["diagOutOptions"];          // diag. výstup do logu Jobs v KBC - klíče: basicStatusInfo, jsonParseInfo, basicIntegrInfo, detailIntegrInfo
-$adhocDump              = $config["parameters"]["adhocDump"];               // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
-
-// full load / incremental load výstupní tabulky 'calls'
-$incrementalOn = !empty($callsIncrementalOutput['incrementalOn']) ? true : false;   // vstupní hodnota false se vyhodnotí jako empty :)
-
-// za jak dlouhou historii [dny] se generuje inkrementální výstup (0 = jen za aktuální den, 1 = od včerejšího dne včetně [default], ...)
-$jsonHistDays   = $callsIncrementalOutput['incremHistDays'];
-$incremHistDays = $incrementalOn && !empty($jsonHistDays) && is_numeric($jsonHistDays) ? $jsonHistDays : 1;
-/* import parametru z JSON řetězce v definici Customer Science PHP v KBC:
-    {
-        "callsIncrementalOutput": {
-            "incrementalOn": true,
-            "incremHistDays": 3
-        },
-        "diagOutOptions": {
-            "basicStatusInfo": true
-        }
-    }
-  -> podrobnosti viz https://developers.keboola.com/extend/custom-science
-*/
-// ==============================================================================================================================================================================================
-// proměnné a konstanty
-
-// seznam instancí Daktela
-$instances = [  //1   =>  ["url" => "https://ilinky.daktela.com",     "ver" => 5],
-              //  2   =>  ["url" => "https://dircom.daktela.com",     "ver" => 5],
-                3   =>  ["url" => "https://conectart.daktela.com",  "ver" => 6]
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// struktura tabulek
-
-/* základní požadavky nutné u pořadí tabulek:
-        - 'records' a 'recordSnapshots' se odkazují na 'statuses'.'idstatus' → musí být uvedeny až za 'statuses' (pro případ použití commonStatuses)
-        - 'records' a 'fieldValues' se tvoří pomocí pole $fields vzniklého z tabulky 'fields' → musí být uvedeny až za 'fields' (kvůli foreach)
-   detailní požadavky pořadí tabulek (respektující integritní vazby mezi tabulkami pro správnou funkci integritní validace - stejné jako u writeru):
-        skupina 1  -  (groups)*, (instances)*, statuses                         * - out-only tabulky, vznikají v transformaci
-        skupina 2  -  queues, fields, users, pauses
-        skupina 3  -  loginSessions, pauseSessions, queueSessions, calls
-        skupina 4  -  records
-        skupina 5  -  recordSnapshots, (fieldValues)*
-        skupina 6  -  databases, ticketSla, crmRecordTypes
-        skupina 7  -  accounts, ticketCategories
-        skupina 8  -  contacts
-        skupina 9  -  tickets
-        skupina 10 -  crmRecords, activities
-        skupina 11 -  crmRecordSnapshots
-*/
-
-// vstupně-výstupní tabulky (načtou se jako vstupy, transformují se a výsledek je zapsán jako výstup)
-
-// // "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName),
-//           "json" - jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty (0/1)]
-
-$tabsInOutV56_part1 = [
-    // skupina 1 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
-                                "title"                 =>  ["instPrf" => 0]
-                            ],
-    // skupina 2 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
-                                "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "idgroup"               =>  ["instPrf" => 0]
-                            ],  // 'idgroup' je v IN tabulce NÁZEV → neprefixovat;  není to FK podléhající integritní validaci (groups jsou udvozeny z queues)
-    "fields"            =>  [   "idfield"               =>  ["instPrf" => 1, "pk" => 1],
-                                "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "name"                  =>  ["instPrf" => 0]
-                            ],
-    "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
-                                "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "email"                 =>  ["instPrf" => 0]
-                            ],
-    "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
-                                "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "type"                  =>  ["instPrf" => 0],
-                                "paid"                  =>  ["instPrf" => 0]
-                            ],
-    // skupina 3 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0],
-                                "end_time"              =>  ["instPrf" => 0],
-                                "duration"              =>  ["instPrf" => 0],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
-                            ],
-    "pauseSessions"     =>  [   "idpausesession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0],
-                                "end_time"              =>  ["instPrf" => 0],
-                                "duration"              =>  ["instPrf" => 0],
-                                "idpause"               =>  ["instPrf" => 0, "fk" => "pauses"],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
-                            ],
-    "queueSessions"     =>  [   "idqueuesession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0], 
-                                "end_time"              =>  ["instPrf" => 0],
-                                "duration"              =>  ["instPrf" => 0],
-                                "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
-                            ]
-];
-$tabsInOutV5  = [
-    // skupina 3 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "calls"             =>  [   "idcall"                =>  ["instPrf" => 1, "pk" => 1],
-                                "call_time"             =>  ["instPrf" => 0],
-                                "direction"             =>  ["instPrf" => 0],
-                                "answered"              =>  ["instPrf" => 0],
-                                "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
-                                "clid"                  =>  ["instPrf" => 0],
-                                "contact"               =>  ["instPrf" => 0],
-                                "did"                   =>  ["instPrf" => 0],
-                                "wait_time"             =>  ["instPrf" => 0],
-                                "ringing_time"          =>  ["instPrf" => 0],
-                                "hold_time"             =>  ["instPrf" => 0],
-                                "duration"              =>  ["instPrf" => 0],
-                                "orig_pos"              =>  ["instPrf" => 0],
-                                "position"              =>  ["instPrf" => 0],
-                                "disposition_cause"     =>  ["instPrf" => 0],
-                                "disconnection_cause"   =>  ["instPrf" => 0],
-                                "pressed_key"           =>  ["instPrf" => 0],
-                                "missed_call"           =>  ["instPrf" => 0],
-                                "missed_call_time"      =>  ["instPrf" => 0],
-                                "score"                 =>  ["instPrf" => 0],
-                                "note"                  =>  ["instPrf" => 0],
-                                "attemps"               =>  ["instPrf" => 0],
-                                "qa_user_id"            =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ] 
-];
-$tabsInOutV56_part2 = [
-    // skupina 4 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "records"           =>  [   "idrecord"              =>  ["instPrf" => 1, "pk" => 1],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
-                                "idqueue"               =>  ["instPrf" => 1, "fk" => "queues"],
-                                "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
-                                "iddatabase"            =>  ["instPrf" => 1, "fk" => "databases"],
-                                "number"                =>  ["instPrf" => 0],
-                                "idcall"                =>  ["instPrf" => 1/*, "fk" => "calls"*/],
-                                "action"                =>  ["instPrf" => 0],
-                                "edited"                =>  ["instPrf" => 0],
-                                "created"               =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  =>  ["instPrf" => 0, "json" => 0]               // "json" => <0/1> ~ jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty
-                            ],
-    // skupina 5 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "recordSnapshots"   =>  [   "idrecordsnapshot"      =>  ["instPrf" => 1, "pk" => 1],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
-                                "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
-                                "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
-                                "idcall"                =>  ["instPrf" => 1/*, "fk" => "calls"*/],
-                                "created"               =>  ["instPrf" => 0],
-                                "created_by"            =>  ["instPrf" => 1],                           // neuvažujeme jako FK do "users" (není to tak v GD)
-                                "nextcall"              =>  ["instPrf" => 0]
-                            ]
-];
-$tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u Daktely v6
-    // skupina 6 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "databases"         =>  [   "iddatabase"            => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idqueue"               => ["instPrf" => 1, "fk" => "queues"],
-                                "description"           => ["instPrf" => 0],
-                                "stage"                 => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "time"                  => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ],
-    "ticketSla"         =>  [   "idticketsla"           => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "response_low"          => ["instPrf" => 0],
-                                "response_normal"       => ["instPrf" => 0],
-                                "response_high"         => ["instPrf" => 0],
-                                "solution_low"          => ["instPrf" => 0],
-                                "solution_normal"       => ["instPrf" => 0],
-                                "solution_high"         => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ],
-    "crmRecordTypes"    =>  [   "idcrmrecordtype"       => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "description"           => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ],
-    // skupina 7 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "accounts"          =>  [   "idaccount"             => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idticketsla"           => ["instPrf" => 1, "fk" => "ticketSla"],
-                                "survey"                => ["instPrf" => 0],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "description"           => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ],
-    "ticketCategories"  =>  [   "idticketcategory"      => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idticketsla"           => ["instPrf" => 1, "fk" => "ticketSla"],
-                                "idqueue"               => ["instPrf" => 1, "fk" => "queues"],
-                                "survey"                => ["instPrf" => 0],
-                                "template_email"        => ["instPrf" => 0],
-                                "template_page"         => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ],
-    // skupina 8 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "contacts"          =>  [   "idcontact"             => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "firstname"             => ["instPrf" => 0],
-                                "lastname"              => ["instPrf" => 0],
-                                "idaccount"             => ["instPrf" => 1, "fk" => "accounts"],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "description"           => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0, "json" => 1],
-                                "number"                => ["instPrf" => 0]
-                            ],
-    // skupina 9 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "tickets"           =>  [   "idticket"              => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idticketcategory"      => ["instPrf" => 1, "fk" => "ticketCategories"],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "email"                 => ["instPrf" => 0],
-                                "idcontact"             => ["instPrf" => 1, "fk" => "contacts"],
-                                "idstatus"              => ["instPrf" => 1, "fk" => "statuses"],
-                                "description"           => ["instPrf" => 0],
-                                "stage"                 => ["instPrf" => 0],
-                                "priority"              => ["instPrf" => 0],
-                                "sla_deadtime"          => ["instPrf" => 0],
-                                "sla_change"            => ["instPrf" => 0],
-                                "sla_notify"            => ["instPrf" => 0],
-                                "sla_duration"          => ["instPrf" => 0],
-                                "sla_custom"            => ["instPrf" => 0],
-                                "survey"                => ["instPrf" => 0],
-                                "survey_offered"        => ["instPrf" => 0],
-                                "satisfaction"          => ["instPrf" => 0],
-                                "satisfaction_comment"  => ["instPrf" => 0],
-                                "reopen"                => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0],
-                                "edited"                => ["instPrf" => 0],
-                                "edited_by"             => ["instPrf" => 1],
-                                "first_answer"          => ["instPrf" => 0],
-                                "first_answer_duration" => ["instPrf" => 0],
-                                "closed"                => ["instPrf" => 0],
-                                "unread"                => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0, "json" => 0]
-                            ],
-    // skupina 10 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "crmRecords"        =>  [   "idcrmrecord"           => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],    
-                                "title"                 => ["instPrf" => 0],
-                                "idcrmrecordtype"       => ["instPrf" => 1, "fk" => "crmRecordTypes"],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "idcontact"             => ["instPrf" => 1, "fk" => "contacts"],
-                                "idaccount"             => ["instPrf" => 1, "fk" => "accounts"],
-                                "idticket"              => ["instPrf" => 1, "fk" => "idticket"],
-                                "idstatus"              => ["instPrf" => 1, "fk" => "idstatus"],
-                                "description"           => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "edited"                => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0],
-                                "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "form"                  => ["instPrf" => 0, "json" => 0]
-                            ],
-    "activities"        =>  [   "idactivity"            => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idcontact"             => ["instPrf" => 1, "fk" => "contacts"],
-                                "idticket"              => ["instPrf" => 1, "fk" => "tickets"],
-                                "idqueue"               => ["instPrf" => 1, "fk" => "queues"],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "idrecord"              => ["instPrf" => 1, "fk" => "records"],
-                                "idstatus"              => ["instPrf" => 1, "fk" => "statuses"],
-                                "action"                => ["instPrf" => 0],
-                                "type"                  => ["instPrf" => 0],
-                                "priority"              => ["instPrf" => 0],
-                                "description"           => ["instPrf" => 0],
-                                "time"                  => ["instPrf" => 0],
-                                "time_wait"             => ["instPrf" => 0],
-                                "time_open"             => ["instPrf" => 0],
-                                "time_close"            => ["instPrf" => 0],
-                                "created_by"            => ["instPrf" => 1],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/],
-                                "item"                  => ["instPrf" => 0]
-                            ],
-    // skupina 11 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    "crmRecordSnapshots"=>  [   "idcrmrecordsnapshot"   => ["instPrf" => 1, "pk" => 1],
-                                "name"                  => ["instPrf" => 0],
-                                "title"                 => ["instPrf" => 0],
-                                "idcontact"             => ["instPrf" => 1, "fk" => "contacts"],
-                                "idaccount"             => ["instPrf" => 1, "fk" => "accounts"],
-                                "idticket"              => ["instPrf" => 1, "fk" => "tickets"],
-                                "idcrmrecord"           => ["instPrf" => 1, "fk" => "crmRecords"],
-                                "iduser"                => ["instPrf" => 1, "fk" => "users"],
-                                "idstatus"              => ["instPrf" => 1, "fk" => "statuses"],
-                                "idcrmrecordtype"       => ["instPrf" => 1, "fk" => "crmRecordTypes"],
-                                "description"           => ["instPrf" => 0],
-                                "deleted"               => ["instPrf" => 0],
-                                "created_by"            => ["instPrf" => 0],
-                                "time"                  => ["instPrf" => 0],
-                                "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0/*, "fk" => "instances"*/]
-                            ]
-];
-$tabsInOut = [
-    5                   =>  array_merge($tabsInOutV56_part1, $tabsInOutV5, $tabsInOutV56_part2),
-    6                   =>  array_merge($tabsInOutV56_part1, $tabsInOutV56_part2, $tabsInOutV6)
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// jen výstupní tabulky
-$tabsOutOnlyV56 = [         // tabulky, které vytváří transformace a objevují se až na výstupu (nejsou ve vstupním bucketu KBC) používané u Daktely v5 i v6
-    "fieldValues"       =>  [   "idfieldvalue"          => ["instPrf" => 1],
-                                "idrecord"              => ["instPrf" => 1],
-                                "idfield"               => ["instPrf" => 1],
-                                "value"                 => ["instPrf" => 0]
-                            ],
-    "groups"            =>  [   "idgroup"               => ["instPrf" => 1],
-                                "title"                 => ["instPrf" => 0]
-                            ],
-    "instances"         =>  [   "idinstance"            => ["instPrf" => 0],
-                                "url"                   => ["instPrf" => 0]
-                            ]
-];
-$tabsOutOnlyV6 = [          // tabulky, které vytváří transformace a objevují se až na výstupu (nejsou ve vstupním bucketu KBC) používané pouze u Daktely v6
-    "calls"             =>  [   "idcall"                => ["instPrf" => 1],
-                                "call_time"             => ["instPrf" => 0],
-                                "direction"             => ["instPrf" => 0],
-                                "answered"              => ["instPrf" => 0],
-                                "idqueue"               => ["instPrf" => 1],
-                                "iduser"                => ["instPrf" => 1],
-                                "clid"                  => ["instPrf" => 0],
-                                "contact"               => ["instPrf" => 0],
-                                "did"                   => ["instPrf" => 0],
-                                "wait_time"             => ["instPrf" => 0],
-                                "ringing_time"          => ["instPrf" => 0],
-                                "hold_time"             => ["instPrf" => 0],
-                                "duration"              => ["instPrf" => 0],
-                                "orig_pos"              => ["instPrf" => 0],
-                                "position"              => ["instPrf" => 0],
-                                "disposition_cause"     => ["instPrf" => 0],
-                                "disconnection_cause"   => ["instPrf" => 0],
-                                "pressed_key"           => ["instPrf" => 0],
-                                "missed_call"           => ["instPrf" => 0],
-                                "missed_call_time"      => ["instPrf" => 0],
-                                "score"                 => ["instPrf" => 0],
-                                "note"                  => ["instPrf" => 0],
-                                "attemps"               => ["instPrf" => 0],
-                                "qa_user_id"            => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
-                            ],
-    "contFieldVals"     =>  [   "idcontfieldval"        => ["instPrf" => 1],
-                                "idcontact"             => ["instPrf" => 1],
-                                "idfield"               => ["instPrf" => 1],
-                                "value"                 => ["instPrf" => 0]
-                            ],                                                  // hodnoty formulářových polí z tabulky "contacts"
-    "tickFieldVals"     =>  [   "idtickfieldval"        => ["instPrf" => 1],
-                                "idticket"              => ["instPrf" => 1],
-                                "idfield"               => ["instPrf" => 1],
-                                "value"                 => ["instPrf" => 0]
-                            ],                                                  // hodnoty formulářových polí z tabulky "tickets"
-    "crmFieldVals"      =>  [   "idcrmfieldval"         => ["instPrf" => 1],
-                                "idcrmrecord"           => ["instPrf" => 1],
-                                "idfield"               => ["instPrf" => 1],
-                                "value"                 => ["instPrf" => 0]
-                            ],                                                  // hodnoty formulářových polí z tabulky "crmRecords"
-    /* "actItemVals"    =>  [   "idactfieldval"         => ["instPrf" => 1],
-                                "idactivity"            => ["instPrf" => 1],
-                                "idfield"               => ["instPrf" => 1],
-                                "value"                 => ["instPrf" => 0]
-                            ]                                                   // hodnoty pole "item" z tabulky "contacts" 
-    */
-];
-$tabsOutOnly = [
-    5                   =>  $tabsOutOnlyV56,
-    6                   =>  array_merge($tabsOutOnlyV56, $tabsOutOnlyV6)
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// parametry parsování JSON řetězců záznamů z formulářových polí do out-only tabulek hodnot formulářových polí
-$formFieldsOuts = [     // <vstupní tabulka kde se nachází form. pole> => [<název out-only tabulky hodnot form. polí>, <umělý inkrementální index hodnot form. polí>]
-    "records"       =>  "fieldValues",
-    "contacts"      =>  "contFieldVals",
-    "tickets"       =>  "tickFieldVals",
-    "crmRecords"    =>  "crmFieldVals",
-    //"activities"  =>  "actItemVals"
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// jen vstupní tabulky
-$tabsInOnlyV5  = $tabsInOnlyV56 = [];
-$tabsInOnlyV6  = [
-    "crmFields"         =>  [   "idcrmfield"            => ["instPrf" => 1],
-                                "title"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
-                                "name"                  => ["instPrf" => 0]
-                            ]
-];
-$tabsInOnly = [
-    5                   =>  array_merge($tabsInOnlyV5, $tabsInOnlyV56),
-    6                   =>  array_merge($tabsInOnlyV56, $tabsInOnlyV6)
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// jen vstupní sloupce
-$colsInOnly = [         // seznam sloupců, které se nepropíší do výstupních tabulek (slouží jen k internímu zpracování)
- // "název_tabulky"     =>  ["název_sloupce_1", "název_sloupce_2, ...]
-    "fields"            =>  ["name"],   // systémové názvy formulářových polí, slouží jen ke spárování "čitelných" názvů polí s hodnotami polí parsovanými z JSONu
-    "records"           =>  ["form"],   // hodnoty formulářových polí z tabulky "records"    jako neparsovaný JSON
-    "contacts"          =>  ["form"],   // hodnoty formulářových polí z tabulky "contacts"   jako neparsovaný JSON
-    "tickets"           =>  ["form"],   // hodnoty formulářových polí z tabulky "tickets"    jako neparsovaný JSON
-    "crmRecords"        =>  ["form"],   // hodnoty formulářových polí z tabulky "crmRecords" jako neparsovaný JSON
-    //"activities"      =>  [...]
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// proměnné pro práci se všemi tabulkami
-$tabsList_InOut = [
-    5                   =>  array_keys($tabsInOut[5]),
-    6                   =>  array_keys($tabsInOut[6])
-];
-$tabs_InOut_InOnly = [     // nutno dodržet pořadí spojování polí, aby in-only tabulka crmFields (v6) byla před tabulkami závislými na fields !
-    5                   => array_merge($tabsInOnly[5], $tabsInOut[5]),
-    6                   => array_merge($tabsInOnly[6], $tabsInOut[6])
-];
-$tabs_InOut_OutOnly = [      
-    5                   => array_merge($tabsInOut[5], $tabsOutOnly[5]),
-    6                   => array_merge($tabsInOut[6], $tabsOutOnly[6])
-];
-$tabsList_InOut_InOnly = [
-    5                   => array_keys($tabs_InOut_InOnly[5]),
-    6                   => array_keys($tabs_InOut_InOnly[6])
-];
-$tabsList_InOut_OutOnly = [
-    5                   => array_keys($tabs_InOut_OutOnly[5]),
-    6                   => array_keys($tabs_InOut_OutOnly[6])
-];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// pole obsahující unikátní seznam výstupních tabulek všech verzí Daktely s počtem sloupců jednotlivých tabulek
-$outTabsColsCount = [];
-foreach ($tabs_InOut_OutOnly as $verTabs) {                     // iterace podle verzí Daktely (klíč = 5, 6, ...)
-    foreach ($verTabs as $tab => $cols) {                       // iterace definic tabulek v rámci dané verze
-        $colNames = array_key_exists($tab, $colsInOnly) ? array_diff(array_keys($cols), $colsInOnly[$tab]) : array_keys($cols); // jsou-li některé sloupce jen vstupní nezapočtou se
-        if (!array_key_exists($tab, $outTabsColsCount)) {
-            $outTabsColsCount[$tab] = count($colNames);
-        }
-    }
-}
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// seznam výstupních tabulek, u kterých požadujeme mít ID a hodnoty společné pro všechny instance
-                // "název_tabulky" => 0/1 ~ vypnutí/zapnutí volitelného požadavku na indexaci záznamů v tabulce společnou pro všechny instance
-$instCommonOuts = ["statuses" => 1, "groups" => 1, "fieldValues" => 1];
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// ostatní proměnné
-
-// volitelná náhrada prázdných hodnot ID umělou hodnotou ID, která odpovídá umělému title
-// motivace:  pro joinování tabulek v GD (tam se prázdná hodnota defaultně označuje jako "(empty value)")
-$emptyToNA   = true;
-$fakeId      = "n/a";
-$fakeTitle   = "";                                          // původně "(empty value)"
-$tabsFakeRow = $tabsList_InOut[5] + $tabsList_InOut[6];     // = všechny InOut tabulky (sjednocení) napříč verzemi (původně jen ["users", "statuses"])
-
-// počty číslic, na které jsou doplňovány ID's (kvůli řazení v GoodData je výhodné mít konst. délku ID's) a oddělovač prefixu od hodnoty
-$idFormat = [
-    "sep"       =>  "",                                     // znak oddělující ID instance od inkrementálního ID dané tabulky ("", "-" apod.)
-    "instId"    =>  ceil(log10(max(2, count($instances)))), // počet číslic, na které je doplňováno ID instance (hodnota před oddělovačem) - určuje se dle počtu instancí
-    "idTab"     =>  8,                                      // výchozí počet číslic, na které je doplňováno inkrementální ID dané tabulky (hodnota za oddělovačem);
-                                                            // příznakem potvrzujícím, že hodnota dostačovala k indexaci záznamů u všech tabulek, je proměnná $idFormatIdEnoughDigits;
-                                                            // nedoplňovat = "" / 0 / NULL / []  (~ hodnota, kterou lze vyhodnotit jako empty)    
-    "idField"   =>  3                                       // výchozí počet číslic, na které je doplňováno inkrementální ID hodnot konkrétního form. pole
-];
-
-// delimitery názvu skupiny v queues.idgroup
-$delim = [ "L" => "[[" , "R" => "]]" ];
-
-// proměnná "action" typu ENUM u campaignRecords - převodní pole číselných kódů akcí na názvy akcí
-$campRecordsActions = [
-    "0" => "Not assigned",
-    "1" => "Ready",
-    "2" => "Called",
-    "3" => "Call in progress",
-    "4" => "Hangup",
-    "5" => "Done",
-    "6" => "Rescheduled"
-];
-
-// klíčová slova pro identifikaci typů formulářových polí a pro validaci + konverzi obsahu formulářových polí
-$keywords = [
-    "dateEq" => ["od", "do"],
-    "mailEq" => ["mail", "email", "e-mail"],
-    "date"   => ["datum"],
-    "name"   => ["jméno", "jmeno", "příjmení", "prijmeni", "řidič", "ceo", "makléř", "předseda"],
-    "addr"   => ["adresa", "address", "město", "mesto", "obec", "část obce", "ulice", "čtvrť", "ctvrt", "okres"],
-    "psc"    => ["psč", "psc"],
-    "addrVal"=> ["do","k","ke","mezi","na","nad","pod","před","při","pri","u","ve","za","čtvrť","ctvrt","sídliště","sidliste","sídl.","sidl.",
-                 "ulice","ul.","třída","trida","tř.","tr.","nábřeží","nábř.","nabrezi","nabr.","alej","sady","park","provincie","svaz","území","uzemi",
-                 "království","kralovstvi","republika","stát","stat","ostrovy", "okr.","okres","kraj", "kolonie","č.o.","c.o.","č.p.","c.p."],
-                 // místopisné předložky a označení
-    "romnVal"=> ["i", "ii", "iii", "iv", "vi", "vii", "viii", "ix", "x", "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx"],
-    "noConv" => ["v"]   // nelze rozhodnout mezi místopis. předložkou a řím. číslem → nekonvertovat case    
-];
-// ==============================================================================================================================================================================================
-// funkce
-                                                            // prefixování hodnoty atributu identifikátorem instance + nastavení požadované délky num. řetězců
-function setIdLength ($instId = 0, $str, $useInstPref = true, $objType = "tab") { 
-    global $idFormat, $fakeId;
-    $len = $objType=="tab" ? $idFormat["idTab"] : $idFormat["idField"]; // jde o ID položky tabuky / ID form. pole (objType = tab / fielf)
-    switch ($str) {
-        case "":        return "";                          // vstupní hodnota je prázdný řetězec
-        case $fakeId:   return $fakeId;                     // vstupní hodnota je prázdný řetězec po průchodem fcí emptyToNA, tj. $fakeId (typicky 'n/a')
-        default:        $idFormated = !empty($len) ? sprintf('%0'.$len.'s', $str) : $str;
-                        switch ($useInstPref) {                 // true = prefixovat hodnotu identifikátorem instance a oddělovacím znakem
-                            case true:  return sprintf('%0'.$idFormat["instId"].'s', $instId) . $idFormat["sep"] . $idFormated;
-                            case false: return $idFormated;    
-                        }   
-    }
-}                                                       // prefixují se jen vyplněné hodnoty (strlen > 0)
-function logInfo ($text, $dumpLevel="basicStatusInfo") {// volitelné diagnostické výstupy do logu
-    global $diagOutOptions;
-    $dumpKey = array_key_exists($dumpLevel, $diagOutOptions) ? $dumpLevel : "basicStatusInfo";
-    echo $diagOutOptions[$dumpKey] ? $text."\n" : "";
-}
-function groupNameParse ($str) {                        // separace názvu skupiny jako podřetězce ohraničeného definovanými delimitery z daného řetězce
-    global $delim;
-    $match = [];                                        // "match array"
-    preg_match("/".preg_quote($delim["L"])."(.*?)".preg_quote($delim["R"])."/s", $str, $match);
-    return empty($match[1]) ?  "" : $match[1];          // $match[1] obsahuje podřetězec ohraničený delimitery ($match[0] dtto včetně delimiterů)
-}
-function phoneNumberCanonic ($str) {                    // veřejná tel. čísla omezená na číslice 0-9 (48-57D = 30-39H), bez úvodních nul (ltrim)
-    $strConvert = ltrim(preg_replace("/[\\x00-\\x2F\\x3A-\\xFF]/", "", $str), "0");
-    return (strlen($strConvert) == 9 ? "420" : "") . $strConvert;
-}
-function trim_all ($str, $what = NULL, $thrownWith = " ", $replacedWith = "| ") {      // odebrání nadbytečných mezer a formátovacích znaků z řetězce
-    if ($what === NULL) {
-        //  character   dec     hexa    use
-        //  "\0"         0      \\x00   Null Character
-        //  "\t"         9      \\x09   Tab
-        //  "\n"        10      \\x0A   New line
-        //  "\x0B"      11      \\x0B   Vertical Tab
-        //  "\r"        13      \\x0D   New Line in Mac
-        //  " "         32      \\x20   Space       
-        $charsToThrow   = "\\x00-\\x09\\x0B-\\x20\\xFF";// all white-spaces and control chars (hexa)
-        $charsToReplace = "\\x0A";                      // new line
-    }
-    $str = preg_replace("/[".$charsToThrow . "]+/", $thrownWith,   $str);       // náhrada prázdných a řídicích znaků mezerou
-    $str = preg_replace("/[".$charsToReplace."]+/", $replacedWith, $str);       // náhrada odřádkování znakem "|" (vyskytují se i vícenásobná odřádkování)
-    $str = str_replace ("|  ", "", $str);                                       // odebrání mezer oddělených "|" zbylých po vícenásobném odřádkování
-    $str = str_replace ("\N" , "", $str);                   // zbylé "\N" způsobují chybu importu CSV do výst. tabulek ("Missing data for not-null field")
-    return $str;
-}
-function substrInStr ($str, $substr) {                                          // test výskytu podřetězce v řetězci
-    return strlen(strstr($str, $substr)) > 0;                                   // vrací true / false
-}
-function mb_ucwords ($str) {                                                    // ucwords pro multibyte kódování
-    return mb_convert_case($str, MB_CASE_TITLE, "UTF-8");
-}
-function convertAddr ($str) {                                                   // nastavení velikosti písmen u adresy (resp. částí dresy)
-    global $keywords;
-    $addrArrIn  = explode(" ", $str);                                           // vstupní pole slov
-    $addrArrOut = [];                                                           // výstupní pole slov
-    foreach($addrArrIn as $id => $word) {                                       // iterace slov ve vstupním poli
-        switch ($id) {                                                          // $id ... pořadí slova
-            case 0:     $addrArrOut[] =  mb_ucwords($word); break;              // u 1. slova jen nastavit velké 1. písmeno a ostatní písmena malá
-            default:    $wordLow = mb_strtolower($word, "UTF-8");               // slovo malými písmeny (pro test výskytu slova v poli $keywords aj.)
-                        if (in_array($wordLow, $keywords["noConv"])) {
-                            $addrArrOut[] = $word;                              // nelze rozhodnout mezi místopis. předložkou a řím. číslem → bez case konverze
-                        } elseif (in_array($wordLow, $keywords["addrVal"])) {
-                            $addrArrOut[] = $wordLow;                           // místopisné předložky a místopisná označení malými písmeny
-                        } elseif (in_array($wordLow, $keywords["romnVal"])) {
-                            $addrArrOut[] = strtoupper($word);                  // římská čísla velkými znaky
-                        } else {
-                            $addrArrOut[] = mb_ucwords($word);                  // 2. a další slovo, pokud není uvedeno v $keywords
-                        }
-        }
-    }
-    return implode(" ", $addrArrOut);
-}
-function remStrMultipl ($str, $delimiter = " ") {                               // převod multiplicitních podřetězců v řetězci na jeden výskyt podřetězce
-    return implode($delimiter, array_unique(explode($delimiter, $str)));
-}
-function convertDate ($dateStr) {                                               // konverze data různého (i neznámého) formátu na požadovaný formát
-    if (strlen($dateStr) <= 12) {$dateStr = str_replace(" ", "", $dateStr);}    // odebrání mezer u data do délky dd. mm. rrrr (12 znaků)
-    $dateStr = preg_replace("/_/", "-", $dateStr);                              // náhrada případných podtržítek pomlčkami
-    try {
-        $date = new DateTime($dateStr);                                         // pokus o vytvoření objektu $date jako instance třídy DateTime z $dateStr
-    } catch (Exception $e) {                                                    // $dateStr nevyhovuje konstruktoru třídy DateTime ...  
-        return $dateStr;                                                        // ... vrátí původní datumový řetězec (nelze převést na požadovaný tvar)
-    }                                                                           // $dateStr vyhovuje konstruktoru třídy DateTime ...  
-    return $date -> format( (!strpos($dateStr, "/") ? 'Y-m-d' : 'Y-d-m') );     // ... vrátí rrrr-mm-dd (u delimiteru '/' je třeba prohodit m ↔ d)
-}
-function convertMail ($mail) {                                                  // validace e-mailové adresy a převod na malá písmena
-    $mail = strtolower($mail);                                                  // převod e-mailové adresy na malá písmena
-    $isValid = !(!filter_var($mail, FILTER_VALIDATE_EMAIL));                    // validace e-mailové adresy
-    return $isValid ? $mail : "(nevalidní e-mail) ".$mail;                      // vrátí buď e-mail (lowercase), nebo e-mail s prefixem "(nevalidní e-mail) "
-}
-function convertPSC ($str) {                                                    // vrátí buď PSČ ve tvaru xxx xx (validní), nebo "nevalidní PSČ ve formuláři"
-    $str = str_replace(" ", "", $str);                                          // odebrání mezer => pracovní tvar validního PSČ je xxxxx
-    return (is_numeric($str) && strlen($str) == 5) ? substr($str, 0, 3)." ".substr($str, 3, 2) : "nevalidní PSČ ve formuláři";  // finální tvar PSČ je xxx xx
-}
-function convertFieldValue ($idfield, $val) {                                   // validace + případná korekce hodnot formulářových polí
-    global $fields, $keywords;                                                  // $key = název klíče form. pole; $val = hodnota form. pole určená k validaci
-    $titleLow = mb_strtolower($fields[$idfield]["title"], "UTF-8");             // title malými písmeny (jen pro test výskytu klíčových slov v title)                                                                             
-    if (in_array($titleLow, $keywords["dateEq"])) {return convertDate($val);}
-    if (in_array($titleLow, $keywords["mailEq"])) {return convertMail($val);} 
-    foreach (["date","name","addr","psc"] as $valType) {
-        foreach ($keywords[$valType] as $substr) {
-            switch ($valType) {
-                case "date":    if (substrInStr($titleLow, $substr)) {return convertDate($val);}    continue;
-                case "name":    if (substrInStr($titleLow, $substr)) {return mb_ucwords($val) ;}    continue;
-                case "addr":    if (substrInStr($titleLow, $substr)) {return convertAddr($val);}    continue;
-                case "psc" :    if (substrInStr($titleLow, $substr)) {return convertPSC($val) ;}    continue;
-            }
-        }
-    }
-    return $val;        // hodnota nepodléhající validaci a korekci (žádná část title form. pole není v $keywords[$valType]
-}
-function boolValsUnify ($val) {         // dvojici booleovských hodnot ("",1) u v6 převede na dvojici hodnot (0,1) používanou u v5 (lze použít u booleovských atributů)
-    global $inst;
-    switch ($inst["ver"]) {
-        case 5: return $val;                    // v5 - hodnoty 0, 1 → propíší se
-        case 6: return $val=="1" ? $val : "0";  // v6 - hodnoty "",1 → protože jde o booleovskou proměnnou, nahradí se "" nulami
-    }
-}
-function actionCodeToName ($actCode) {  // atribut "action" typu ENUM - převod číselného kódu akce na název akce
-    global $campRecordsActions;
-    return array_key_exists($actCode, $campRecordsActions) ? $campRecordsActions[$actCode] : $actCode;
-}
-function setFieldsShift () {            // posun v ID formCrmFields oproti ID formFields
-    global $formFieldsIdShift, $formCrmFieldsIdShift, $idFormat;
-    $formFieldsIdShift    = 0;
-    $formCrmFieldsIdShift = pow(10, $idFormat["idTab"] - 1);   // přidá v indexu číslici 1 na první pozici zleva (číslice nejvyššího řádu)
-}
-function initGroups () {                // nastavení výchozích hodnot proměnných popisujících skupiny
-    global $groups, $idGroup;
-    $groups             = [];           // 1D-pole skupin - prvek pole má tvar groupName => idgroup
-    $idGroup            = 0;            // umělý inkrementální index pro číslování skupin
-}
-function initStatuses () {              // nastavení výchozích hodnot proměnných popisujících stavy
-    global $statuses, $idStatus, $idstatusFormated;
-    $statuses = [];                     /* 3D-pole stavů - prvek pole má tvar  <statusId> => ["title" => <hodnota>, "statusIdOrig" => [pole hodnot]],
-                                           kde statusId a title jsou unikátní, statusId jsou neformátované indexy (bez prefixu instance, který v commonStatus
-                                           režimu nemá význam, a bez formátování na počet číslic požadovaný ve výstupních tabulkách)
-                                           a v poli statusIdOrig jsou originální (prefixované) ID stejnojmenných stavů z různých instancí  */
-    $idStatus             = 0;          // umělý inkrementální index pro číslování stavů (1, 2, ...)
-    unset($idstatusFormated);           // formátovaný umělý index stavu ($idStatus doplněný na počet číslic požadovaný ve výstupních tabulkách)
-}
-function initFields () {                // nastavení výchozích hodnot proměnných popisujících formulářová pole
-    global $fields;
-    $fields = [];                       // 2D-pole formulářových polí - prvek pole má tvar <name> => ["idfield" => <hodnota>, "title" => <hodnota>]    
-}
-function iterStatuses ($val, $valType = "statusIdOrig") {               // prohledání 3D-pole stavů $statuses
-    global $statuses, $emptyToNA, $fakeId;                              // $val = hledaná hodnota;  $valType = "title" / "statusIdOrig"
-    if ($valType=="statusIdOrig" && $emptyToNA && $val==$fakeId) {
-        return $fakeId;                                                 // původně prázdná hodnota FK je nahrazena hodnotou $fakeId (typicky "n/a")
-    }
-    foreach ($statuses as $statId => $statRow) {
-        switch ($valType) {
-            case "title":           // $statRow[$valType] je string
-                                    if ($statRow[$valType] == $val) {   // zadaná hodnota v poli $statuses nalezena
-                                        return $statId;                 // ... → vrátí id (umělé) položky pole $statuses, v níž se hodnota nachází
-                                    }
-                                    break;
-            case "statusIdOrig":    // $statRow[$valType] je 1D-pole
-                                    foreach ($statRow[$valType] as $statVal) {
-                                        if ($statVal == $val) {     // zadaná hodnota v poli $statuses nalezena
-                                            return $statId;         // ... → vrátí id (umělé) položky pole $statuses, v níž se hodnota nachází
-                                        }
-                                    }
-        }        
-    }
-    return false;                   // zadaná hodnota v poli $statuses nenalezena
-}
-function callTimeRngCheck ($val) {
-    global $incrementalOn, $incremHistDays; 
-    if ($incrementalOn &&           // je-li u tabulky 'calls' požadován jen inkrementální výstup (hovory novější než...) ...
-        substr($val, 0, 10) < date("Y-m-d", strtotime(-$incremHistDays." days"))) { // ... pak je-li daný hovor starší než... ($val je datumočas) ...   
-            return false;
-    }        
-    return true;
-}
-function emptyToNA ($id) {          // prázdné hodnoty nahradí hodnotou $fakeId - kvůli GoodData, aby zde byla nabídka $fakeTitle [volitelné]
-    global $emptyToNA, $fakeId;
-    return ($emptyToNA && empty($id)) ? $fakeId : $id;
-}
-function checkIdLengthOverflow ($val) {     // kontrola, zda došlo (true) nebo nedošlo (false) k přetečení délky ID určené proměnnou $idFormat["idTab"] ...
-    global $idFormat, $tab;                 // ... nebo umělým ID (groups, statuses, fieldValues)
-        if ($val >= pow(10, $idFormat["idTab"])) {
-            logInfo("PŘETEČENÍ DÉLKY INDEXŮ ZÁZNAMŮ V TABULCE ".$tab);          // volitelný diagnostický výstup do logu                
-            $idFormat["idTab"]++;
-            logInfo("DÉLKA INDEXŮ NAVÝŠENA NA ".$idFormat['idTab']." ČÍSLIC");
-            return true;                    // došlo k přetečení → je třeba začít plnit OUT tabulky znovu, s delšími ID
-        }
-    return false;                           // nedošlo k přetečení (OK)
-}
-function jsonParse ($formArr) {     // formArr je 2D-pole    
-    global $formFieldsOuts, $tab, $fields, $idFieldSrcRec, $idFormat, $instId, $adhocDump;
-    global ${"out_".$formFieldsOuts[$tab]};                                     // název out-only tabulky pro zápis hodnot formulářových polí
-    foreach ($formArr as $key => $valArr) {                                     // $valArr je 1D-pole, obvykle má jen klíč 0 (nebo žádný)                                                                                                
-        if (empty($valArr)) {continue;}                                         // nevyplněné formulářové pole - neobsahuje žádný prvek
-        $idVal = 0;                                                             // ID hodnoty konkrétního form. pole
-        foreach ($valArr as $val) {                                             // klíč = 0,1,... (nezajímavé); $val jsou hodnoty form. polí
-            $fieldVals = [];                                                    // záznam do out-only tabulky 'fieldValues'
-            // optimalizace hodnot formulářových polí, vyřazení prázdných hodnot
-            $val = remStrMultipl($val);                                         // value (hodnota form. pole zbavená multiplicitního výskytu podřetězců)
-            $val = trim_all($val);                                              // value (hodnota form. pole zbavená nadbyteč. mezer a formátovacích znaků)                                                        
-            if (!strlen($val)) {continue;}                                      // prázdná hodnota prvku formulářového pole - kontrola před korekcemi                                                                                   
-            // ----------------------------------------------------------------------------------------------------------------------------------
-            // validace a korekce hodnoty formulářového pole + konstrukce řádku out-only tabulky 'fieldValues'
-            $idVal++;                                                           // inkrement umělého ID hodnot formulářových polí
-            if ($idVal == pow(10, $idFormat["idField"])) {                      // došlo k přetečení délky indexů hodnot form. polí
-            logInfo("PŘETEČENÍ DÉLKY INDEXU HODNOT FORM. POLÍ V TABULCE ".$tab);// volitelný diagnostický výstup do logu
-            $idFormat["idField"]++;            
-            }   // výstupy se nezačínají plnit znovu od začátku, jen se navýší počet číslic ID hodnot form. polí od dotčeného místa dále
-            // ----------------------------------------------------------------------------------------------------------------------------------         
-            $idfield = "";
-            foreach ($fields as $idfi => $field) {                              // v poli $fields dohledám 'idfield' ke známému 'name'
-                $instDig       = floor($idfi/pow(10, $idFormat["idTab"]));         // číslice vyjadřující ID aktuálně zpracovávané instance
-                $fieldShiftDig = floor($idfi/pow(10, $idFormat["idTab"]-1)) - 10* $instId;  // číslice vyjadřující posun indexace crmFields vůči fields (0/1) 
-                if ($instDig != $instId) {continue;}                            // nejedná se o formulářové pole z aktuálně zpracovávané instance
-                if (($tab == "crmRecords" && $fieldShiftDig == 0) ||
-                    ($tab != "crmRecords" && $fieldShiftDig == 1) ) {continue;} // výběr form. polí odpovídajícího původu (crmFields/fields) pro daný typ tabulky
-                if ($field["name"] == $key) {
-                    logInfo($tab." - NALEZENO PREFEROVANÉ FORM. POLE [".$idfi.", ".$field['name'].", ".$field['title']."]", "jsonParseInfo");
-                    $idfield = $idfi; break;
-                }
-            }
-            if ($idfield == "") {   // nebylo-li nalezeno form. pole odpovídajícího name, pokračuje hledání v druhém z typů form. polí (fields/crmFields)
-                logInfo($tab." - NENALEZENO PREFEROVANÉ FORM. POLE -> ", "jsonParseInfo");  // diag. výstup do logu
-                foreach ($fields as $idfi => $field) {
-                    $instDig       = floor($idfi/pow(10, $idFormat["idTab"]));  // číslice vyjadřující ID aktuálně zpracovávané instance
-                    $fieldShiftDig = floor($idfi/pow(10, $idFormat["idTab"]-1)) - 10* $instId; // číslice vyjadřující posun indexace crmFields vůči fields (0/1)
-                    if ($instDig != $instId) {continue;}                        // nejedná se o formulářové pole z aktuálně zpracovávané instance
-                    if (($tab == "crmRecords" && $fieldShiftDig == 1) ||
-                        ($tab != "crmRecords" && $fieldShiftDig == 0) ) {continue;} // výběr form. polí odpovídajícího původu
-                    if ($field["name"] == $key) {
-                        logInfo("  ALTERNATIVNÍ POLE JE [".$idfi.", ".$field['name'].", ".$field['title']."]", "jsonParseInfo");
-                        $idfield = $idfi; break;
-                    }
-                }
-            } // --------------------------------------------------------------------------------------------------------------------------------                                                              
-            $val = convertFieldValue($idfield, $val);                           // je-li část názvu klíče $key v klíčových slovech $keywords, ...
-                                                                                // ... vrátí validovanou/konvertovanou hodnotu $val, jinak nezměněnou $val                                                            
-            if (!strlen($val)) {continue;}                                      // prázdná hodnota prvku formulářového pole - kontrola po korekcích
-            $fieldVals = [
-                $idFieldSrcRec . $idfield . setIdLength(0,$idVal,false,"field"),// ID cílového záznamu do out-only tabulky hodnot formulářových polí
-                $idFieldSrcRec,                                                 // ID zdrojového záznamu z tabulky obsahující parsovaný JSON
-                $idfield,                                                       // idfield
-                $val                                                            // korigovaná hodnota formulářového pole
-            ];                                                                                                                                                                     
-            ${"out_".$formFieldsOuts[$tab]} -> writeRow($fieldVals);            // zápis řádku do out-only tabulky hodnot formulářových polí
-            if ($adhocDump["active"]) {if ($adhocDump["idFieldSrcRec"] == $idFieldSrcRec) {
-                echo $tab." - ADHOC DUMP (\$key = ".$key."): [idVal ".$fieldVals[0].", idSrcRec ".$fieldVals[1].", idfield ".$fieldVals[2].", val ".$fieldVals[3]."]\n";}}
-        }    
-    }
-}
-function jsonProcessing ($instId, $tab, $colName, $hodnota) {
-    global $jsonList;
-    if (array_key_exists($instId, $jsonList)) {
-        if (array_key_exists($tab, $jsonList[$instId])) {
-            if (array_key_exists($colName, $jsonList[$instId][$tab])) {         // sloupec obsahuje JSON
-                $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
-                if (!is_null($formArr)) {jsonParse($formArr);}                  // hodnota dekódovaného JSONu není NULL → lze ji prohledávat jako pole                
-                return $jsonList[$instId][$tab][$colName] ? true : false;       // buňka obsahovala JSON; po návratu z fce pokračovat/nepokračovat ve zpracování hodnoty
-            }
-        }
-    }
-    return true;                                                                // buňka neobsahovala JSON, po návratu z fce pokračovat ve zpracování hodnoty
-}
-function colParentTab ($instId, $tab, $colName) {                               // nalezení názvu nadřazené tabulky pro daný sloupec (je-li sloupec FK)
-    global $fkList;     //echo " | count(\$fkList) = ".count($fkList);
-    if (array_key_exists($instId, $fkList)) {
-        if (array_key_exists($tab, $fkList[$instId])) {
-            if (array_key_exists($colName, $fkList[$instId][$tab])) {   //echo " | colParentTab-returns ".$fkList[$instId][$tab][$colName];
-                return $fkList[$instId][$tab][$colName];                        // daný sloupec je FK → vrátí název nadřazené tabulky
-            }
-        }
-    }                  // echo " | colParentTab-returnsNULL";                                                                       // daný sloupec není FK → vrátí NULL
-}
-function integrityValid ($instId, $tab, $colName, $unprefixVal) {               // integritní validace
-    global $pkVals, $emptyToNA;     //echo " | count(\$pkVals) = ".count($pkVals);
-    $colParentTab = colParentTab($instId, $tab, $colName);                      // název nadřazené tabulky u sloupce, který je FK
-                        //echo is_null($colParentTab) ? "" : " | \$colParentTab(".$instId.", ".$tab.", ".$colName.") = ".$colParentTab." | ";
-    if (is_null($colParentTab)) {return "notFK";}                               // daný sloupec není FK → vrátí "notFK"
-    if (empty($unprefixVal) && $emptyToNA) {return "2fakeFK";}                  // hodnota FK je sice prázdná, ale bude nahrazena hodnotou $fakeId (typicky "n/a")
-    if (array_key_exists($instId, $pkVals)) {                                   // test existance odpovídajícího záznamu v nadřazené tabulce
-        if (array_key_exists($colParentTab, $pkVals[$instId])) {
-            if (in_array($unprefixVal, $pkVals[$instId][$colParentTab])) {
-                return "validFK";                                               // hodnota $unprefixVal byla nalezena v hodnotách PK nadřazené tabulky
-            } else {
-                logInfo("HODNOTA ".$instId."_".$tab.".".$colName." = \"".$unprefixVal."\" NEMÁ NADŘAZENÝ ZÁZNAM V TABULCE ".$colParentTab." -> NEBUDE PROPSÁNA NA VÝSTUP", "detailIntegrInfo");
-                return "wrongFK";                                               // hodnota $unprefixVal nebyla nalezena v hodnotách PK nadřazené tabulky
-            }
-        }
-    }
-    return "unfound";                                                           // v poli $pkVals nenalezen některý z potřebných klíčů → o integritní správnosti nelze rozhodnout (vrátí "NA")
-}
-function tabItemsIncr ($colName, $integrValidResult) {                          // inkrement počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci
-    global $tabItems;                                                           // $integrValidResult = "integrOk" / "integrFak" / "integrErr"
-    // test existence potřebných počitadel v poli $tabItems, založení chybějících počitadel s nulovou hodnotou
-    if(!array_key_exists($colName, $tabItems))              {$tabItems[$colName] = [];}
-    if(!array_key_exists("total" , $tabItems))              {$tabItems["total"]  = [];}
-    if(!array_key_exists("integrOk" , $tabItems[$colName])) {$tabItems[$colName]["integrOk"] = 0;}  
-    if(!array_key_exists("integrFak", $tabItems[$colName])) {$tabItems[$colName]["integrFak"]= 0;}
-    if(!array_key_exists("integrErr", $tabItems[$colName])) {$tabItems[$colName]["integrErr"]= 0;}
-    if(!array_key_exists("integrOk" , $tabItems["total"] )) {$tabItems["total"] ["integrOk"] = 0;}
-    if(!array_key_exists("integrFak", $tabItems["total"] )) {$tabItems["total"] ["integrFak"]= 0;}
-    if(!array_key_exists("integrErr", $tabItems["total"] )) {$tabItems["total"] ["integrErr"]= 0;}
-    // inkrement požadovaných počitadel
-    $tabItems[$colName][$integrValidResult]++;
-    $tabItems["total"][$integrValidResult]++;
-}
+require_once $homeDir.$ds."kbc_param.php";                                      // načtení parametrů importovaných z konfiguračního JSON řetězce v definici PHP aplikace v KBC
+require_once $homeDir.$ds."variables.php";                                      // načtení definic proměnných a konstant
+require_once $homeDir.$ds."functions.php";                                      // načtení definic funkcí
 logInfo("PROMĚNNÉ A FUNKCE ZAVEDENY");                                          // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 // načtení vstupních souborů
@@ -842,65 +20,72 @@ foreach ($instances as $instId => $inst) {
 }
 logInfo("VSTUPNÍ SOUBORY NAČTENY");     // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
-logInfo("ZAHÁJENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");   // volitelný diagnostický výstup do logu
-/*$pkList =*/ $pkVals = $fkList = $jsonList = [];
-/* struktura polí:  //$pkList = [$instId => [$tab => <název_PK>]]                             ... pole názvů PK pro vst. tabulky
+logInfo("ZAHÁJENO NAČÍTÁNÍ DEFINICE DATOVÉHO MODELU");                          // volitelný diagnostický výstup do logu
+$jsonList = $pkVals = $fkList = [];
+/* struktura polí:  $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON
+                    //$pkList = [$instId => [$tab => <název_PK>]]                             ... pole názvů PK pro vst. tabulky
                     $pkVals   = [$instId => [$tab => [<pole existujících hodnot PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
                     $fkList   = [$instId => [$tab => [$colName => <název_nadřazené_tabulky>]]]... pole názvů nadřazených tabulek pro každý sloupec, který je FK
-                    $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON
 */
 foreach ($instances as $instId => $inst) {                                      // iterace instancí
-    logInfo("ZAHÁJENO PROHLEDÁVÁNÍ INSTANCE ".$instId);                         // volitelný diagnostický výstup do logu        
+    logInfo("NAČÍTÁNÍ DEFINICE INSTANCE ".$instId);                             // volitelný diagnostický výstup do logu        
     
     foreach ($tabs_InOut_InOnly[$inst["ver"]] as $tab => $cols) {               // iterace tabulek; $tab - název tabulky, $cols - pole s parametry sloupců
-        logInfo("ZAHÁJENO PROHLEDÁVÁNÍ TABULKY ".$instId."_".$tab);             // volitelný diagnostický výstup do logu   
+        logInfo("NAČÍTÁNÍ DEFINICE TABULKY ".$instId."_".$tab);                 // volitelný diagnostický výstup do logu   
         
         $colId = 0;                                                             // počitadlo sloupců (číslováno od 0)
         $pkColId = NULL;                                                        // ID sloupce, který je pro danou tabulku PK (číslováno od 0; NULL - PK nenelezen)
         foreach ($cols as $colName => $colAttrs) {                              // iterace sloupců
+            if (array_key_exists("json", $colAttrs)) {                          // nalezen sloupec, který je JSON
+                $jsonList[$instId][$tab][$colName] = $colAttrs["json"];         // uložení příznaku způsobu zpracování JSONu (0/1) do pole $jsonList                                         //
+                logInfo("TABULKA ".$instId."_".$tab." - NALEZEN JSON ".$colName."; DALŠÍ ZPRACOVÁNÍ PO PARSOVÁNÍ = ".$colAttrs["json"]);
+            }
             if (is_null($pkColId) && array_key_exists("pk", $colAttrs)) {       // dosud prohledané sloupce nebyly PK / nalezen sloupec, který je PK
                 //$pkList[$instId][$tab] = $colName;                            // uložení názvu PK do pole $pkList
                 $pkColId = $colId;
                 logInfo("TABULKA ".$instId."_".$tab." - PK NALEZEN (SLOUPEC #".$pkColId.")");
             }
             if (array_key_exists("fk", $colAttrs)) {                            // nalezen sloupec, který je PK
-                $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList                                         //
-                logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]." (SLOUPEC ".$colName.")");
-            }
-            if (array_key_exists("json", $colAttrs)) {                          // nalezen sloupec, který je JSON
-                $jsonList[$instId][$tab][$colName] = $colAttrs["json"];         // uložení příznaku způsobu zpracování JSONu (0/1) do pole $jsonList                                         //
+                $fkList[$instId][$tab][$colName] = $colAttrs["fk"];             // uložení názvu nadřezené tabulky do pole $fkList
                 logInfo("TABULKA ".$instId."_".$tab." - NALEZEN FK DO TABULKY ".$colAttrs["fk"]." (SLOUPEC ".$colName.")");
             }
             $colId ++;                                                          // přechod na další sloupec            
-        }
-        
+        }        
         if (is_null($pkColId)) {
             logInfo("TABULKA ".$instId."_".$tab." - NEBYL NALEZEN PK");
             continue;                                                           // nepokračuje se iterací řádků a načtením hodnot PK do pole, ...
         }                                                                       // ... přejde se rovnou na další tabulku
-        // shromáždění hodnot PK z dané tabulky
-        foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {                // iterace řádků vst. tabulek; $rowNum - ID řádku, $row - pole hodnot
-            if ($rowNum == 0) {continue;}                                       // vynechání hlavičky tabulky
-            $pkVals[$instId][$tab][] = $row[$pkColId];                          // uložení hodnoty PK do pole $pkVals
+        // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        if ($integrityValidationOn) {                                           // shromáždění hodnot PK z dané tabulky
+            logInfo("ZAHÁJENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");       // volitelný diagnostický výstup do logu
+            foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {            // iterace řádků vst. tabulek; $rowNum - ID řádku, $row - pole hodnot
+                if ($rowNum == 0) {continue;}                                   // vynechání hlavičky tabulky
+                $pkVals[$instId][$tab][] = $row[$pkColId];                      // uložení hodnoty PK do pole $pkVals
+            }
+            $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)
+            $pkValsTabCnt = count($pkVals[$instId][$tab]);                      // počet unikátních hodnot PK pro danou tabulku  
+            checkIdLengthOverflow($pkValsTabCnt);                               // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
+            logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");                       // diagnostické výstupy do logu
+            logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
+            if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, 100));}
+            if($pkValsTabCnt > 100) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
         }
-        $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)
-        $pkValsTabCnt = count($pkVals[$instId][$tab]);                          // počet unikátních hodnot PK pro danou tabulku  
-        checkIdLengthOverflow($pkValsTabCnt);                                   // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
-        logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");                       // diagnostické výstupy do logu
-        logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
-        if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, 100));}
-        if($pkValsTabCnt > 100) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
+        // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     }
 }
-logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)");
+if ($integrityValidationOn) {logInfo("DOKONČENO PROHLEDÁNÍ VSTUPNÍCH SOUBORŮ (KONTROLA POČTU ZÁZNAMŮ + PODKLADY PRO INTEGRITNÍ VALIDACI)"); }
+logInfo("DOKONČENO NAČTENÍ DEFINICE DATOVÉHO MODELU");
 $expectedDigs = $idFormat["instId"] + $idFormat["idTab"];
 logInfo("PŘEDPOKLÁDANÁ DÉLKA INDEXŮ VE VÝSTUPNÍCH TABULKÁCH JE ".$expectedDigs." ČÍSLIC");  // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO ZPRACOVÁNÍ DAT");     // volitelný diagnostický výstup do logu
 $idFormatIdEnoughDigits = false;        // příznak potvrzující, že počet číslic určený proměnnou $idFormat["idTab"] dostačoval k indexaci záznamů u všech tabulek (vč. out-only položek)
+$tabItems = [];                         // pole počitadel záznamů v jednotlivých tabulkách (ke kontrole nepřetečení počtu číslic určeném proměnnou $idFormat["idTab"])
+
 while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet číslic určený proměnnou $idFormat["idTab"] dostačoval k indexaci záznamů u všech tabulek (vč. out-only položek)
-   
+    
     foreach ($tabs_InOut_OutOnly[6] as $tab => $cols) {        
+        $tabItems[$tab] = 0;                                // úvodní nastavení nulových hodnot počitadel počtu záznamů všech OUT tabulek
         // vytvoření výstupních souborů    
         ${"out_".$tab} = new \Keboola\Csv\CsvFile($dataDir."out".$ds."tables".$ds."out_".$tab.".csv");
         // zápis hlaviček do výstupních souborů
@@ -935,22 +120,32 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             case 1: ${"common".ucfirst($tab)}=true;         // záznamy v tabulce budou indexovány pro všechny instance společně
         }
     }
-
+    
+    // iterace instancí -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     foreach ($instances as $instId => $inst) {              // procházení tabulek jednotlivých instancí Daktela
         initFields();                                       // nastavení výchozích hodnot proměnných popisujících formulářová pole         
         if (!$commonStatuses)    {initStatuses();   }       // ID a názvy v tabulce 'statuses' požadujeme uvádět pro každou instanci zvlášť    
         if (!$commonGroups)      {initGroups();     }       // ID a názvy v out-only tabulce 'groups' požadujeme uvádět pro každou instanci zvlášť
         if (!$commonFieldValues) {initFieldValues();}       // ID a titles v tabulce 'fieldValues' požadujeme uvádět pro každou instanci zvlášť
         logInfo("ZAHÁJENO ZPRACOVÁNÍ INSTANCE ".$instId);   // volitelný diagnostický výstup do logu
-
+        
+        // iterace tabulek dané instance --------------------------------------------------------------------------------------------------------------------------------------------------------
         foreach ($tabs_InOut_InOnly[$inst["ver"]] as $tab => $cols) {               // iterace tabulek dané instance
             logInfo("ZAHÁJENO ZPRACOVÁNÍ TABULKY ".$instId."_".$tab);               // volitelný diagnostický výstup do logu
-            $tabItems = []; // pole počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci (sčítá se pro danou instanci a danou tabulku)
-                            // struktura pole:  $integrValidCounts = [$colName1 => ["integrOk" => <počet>, "integrErr" => <počet>],
-                            //                                        $colNameN => ["integrOk" => <počet>, "integrErr" => <počet>],
-                            //                                        "total"   => ["integrOk" => <počet>, "integrErr" => <počet>] ]
+            $integrValidCounts = [];    // pole počitadel vstupních záznamů všech/vyhovujících/nevyhovujících integritní validaci (sčítá se pro danou instanci a danou tabulku)
+                                        // struktura pole:  $integrValidCounts = [$colName1 => ["integrOk" => <počet>, "integrErr" => <počet>],
+                                        //                                        $colNameN => ["integrOk" => <počet>, "integrErr" => <počet>],
+                                        //                                        "total"   => ["integrOk" => <počet>, "integrErr" => <počet>] ]
+            
+            // iterace řádků dané tabulky -------------------------------------------------------------------------------------------------------------------------------------------------------
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {                // načítání řádků vstupních tabulek [= iterace řádků]
                 if ($rowNum == 0) {continue;}                                       // vynechání hlavičky tabulky
+                
+                $tabItems[$tab]++;                                                  // inkrement počitadla záznamů v tabulce
+                if (checkIdLengthOverflow($tabItems[$tab])) {                       // došlo k přetečení délky ID určené proměnnou $idFormat["idTab"]
+                    continue 4;                                                     // zpět na začátek cyklu 'while' (začít plnit OUT tabulky znovu, s delšími ID)
+                }
+                
                 $colVals = $callsVals = $fieldRow = [];                             // řádek obecné výstupní tabulky | řádek výstupní tabulky 'calls' | záznam do pole formulářových polí     
                 unset($idFieldSrcRec, $idqueue, $iduser, $type);                    // reset indexu zdrojového záznamu do out-only tabulky hodnot formulářových polí + ID front, uživatelů a typu aktivity                               
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -958,7 +153,8 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 if ($integrityValidationOn) {
                 $colId = 0;                                                         // index sloupce (v každém řádku číslovány sloupce 0,1,2,...) 
                     foreach ($cols as $colName => $colAttrs) {
-                        $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]);          //echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
+                        $intgVld = integrityValid($instId,$tab,$colName,$row[$colId]);
+                        //echo " | ".$instId."_".$tab.".".$colName.": valid = ".$intgVld;
                         switch ($intgVld) {
                             case "validFK": tabItemsIncr($colName, "integrOk");  break; // k hodnotě FK v daném sloupci existuje PK v nadřazené tabulce (= integritně OK)
                             case "2fakeFK": tabItemsIncr($colName, "integrFak"); break; // hodnota FK je prázdná, ale bude nahrazena $fakeId [typicky "n/a"] (→ poté integritně OK)
@@ -1174,9 +370,10 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
             logInfo("DOKONČENO ZPRACOVÁNÍ TABULKY ".$instId."_".$tab);              // volitelný diagnostický výstup do logu
             
             if (!$integrityValidationOn) {continue;}                                // není prováděna integritní validace → přechod k další tabulce  
-            if (empty($tabItems)) {continue;}                                       // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
+            if (empty($integrValidCounts)) {continue;}                              // v tabulce nikde nedošlo ke kontrole integritní validace → přechod k další tabulce            
             logInfo("TABULKA ".$instId."_".$tab." - SOUHRN INTEGRITNÍ ÚSPĚŠNOSTI:", "basicIntegrInfo");
-            foreach ($tabItems as $colName => $colCounts) {      logInfo("\$tabItems[".$colName."]: ");  print_r($colCounts);
+            foreach ($integrValidCounts as $colName => $colCounts) {      
+                //logInfo("\$integrValidCounts[".$colName."]: ");  print_r($colCounts);
                 $colOk  = $colCounts["integrOk"];
                 $colFak = $colCounts["integrFak"];
                 $colErr = $colCounts["integrErr"];
@@ -1185,21 +382,18 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 $percentFak = $colSum > 0 ? round($colFak/$colSum *100 , 1) : "--"; // procento integritně správných hodnot v tabulce po náhrafě prázdných hodnot FK hodnotou $fakeId
                 $percentErr = $colSum > 0 ? round($colErr/$colSum *100 , 1) : "--"; // procento integritně chybných hodnot v tabulce
                 switch ($colName) {
-                    case "total":   logInfo(" - TABULKA ".$instId."_".$tab." CELKEM:", "basicIntegrInfo"); 
-                                    logInfo("  -- ".$colOk. " / ".$colSum." (".$percentOk. "%) ZÁZNAMŮ INTEGRITNĚ OK", "basicIntegrInfo"); 
-                                    logInfo("  -- ".$colFak." / ".$colSum." (".$percentFak."%) ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK", "basicIntegrInfo");
-                                    logInfo("  -- ".$colErr." / ".$colSum." (".$percentErr."%) ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE", "basicIntegrInfo");                                    
-                                    break;                  
-                    default:        logInfo(" - ATRIBUT ".$instId."_".$tab.".".$colName.": ", "basicIntegrInfo");  
-                                    logInfo("  -- ".$colOk. " / ".$colSum." (".$percentOk. "%) ZÁZNAMŮ INTEGRITNĚ OK", "basicIntegrInfo");  
-                                    logInfo("  -- ".$colFak." / ".$colSum." (".$percentFak."%) ZÁZNAMŮ S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK", "basicIntegrInfo");
-                                    logInfo("  -- ".$colErr." / ".$colSum." (".$percentErr."%) ZÁZNAMŮ BEZ ZÁZNAMU V NADŘAZENÉ TABULCE", "basicIntegrInfo");  
+                    case "total":   logInfo("- TABULKA ".$instId."_".$tab." CELKEM:", "basicIntegrInfo"); break;                  
+                    default:        logInfo("- ATRIBUT ".$instId."_".$tab.".".$colName.": ", "basicIntegrInfo");                                    
                 }
+                logInfo("-- " .$colSum." ZÁZNAMŮ CELKEM, Z TOHO",                                       "basicIntegrInfo");  
+                logInfo("--- ".$colOk. " (".$percentOk. "%) INTEGRITNĚ OK",                             "basicIntegrInfo");  
+                logInfo("--- ".$colFak." (".$percentFak."%) S INTEGRITOU ZAJIŠTĚNOU UMĚLÝM PK-FK",      "basicIntegrInfo");
+                logInfo("--- ".$colErr." (".$percentErr."%) S CHYBĚJÍCÍM ZÁZNAMEM V NADŘAZENÉ TABULCE", "basicIntegrInfo");  
             }            
         }
         logInfo("DOKONČENO ZPRACOVÁNÍ INSTANCE ".$instId);                      // volitelný diagnostický výstup do logu
         // operace po zpracování dat ve všech tabulkách jedné instance
-                        //echo "pole 'fields' instance ".$instId.":\n"; print_r($fields); echo "\n";        
+                //echo "pole 'fields' instance ".$instId.":\n"; print_r($fields); echo "\n";        
     }
     // operace po zpracování dat ve všech tabulkách všech instancí
 
@@ -1220,4 +414,3 @@ foreach ($instances as $instId => $inst) {
     $out_instances -> writeRow([$instId, $inst["url"]]);
 }
 logInfo("TRANSFORMACE DOKONČENA");          // volitelný diagnostický výstup do logu
-?>
