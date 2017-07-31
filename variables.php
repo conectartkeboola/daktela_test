@@ -6,10 +6,7 @@ $processedDates     =   [   "start" =>  date("Y-m-d", strtotime(-$histDays['star
                             "end"   =>  date("Y-m-d", strtotime(-$histDays['end']  ." days"))       // koncové datum zpracovávaného rozsahu
                         ];
 
-// počet dní, o které je rozšířen rozsah $processedDates pro načtení hodnot PK do pole $pkVals (použije se při integritní validaci)
-$pkValsReserveDays  =   [   "start" =>  60,
-                            "end"   => 5
-                        ];
+// rozšíření datumového rozsahu pro načtení hodnot PK do pole $pkVals (použije se při integritní validaci)
 $pkValsHistDays     =   [   "start" =>  $histDays["start"] + $pkValsReserveDays["start"], 
                             "end"   =>  $histDays["end"]   + $pkValsReserveDays["end"]
                         ];

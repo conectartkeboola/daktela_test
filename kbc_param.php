@@ -13,9 +13,10 @@ $diagOutOptions         = $confParam["diagOutOptions"];     // diag. výstup do 
 $adhocDump              = $confParam["adhocDump"];          // diag. výstup do logu Jobs v KBC - klíče: active, idFieldSrcRec
 
 // parametry inkrementálního režimu
-$incrementalOn = empty($incrementalMode['incrementalOn']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
-$incrCallsOnly = empty($incrementalMode['incrCallsOnly']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
-$histDays      = $incrementalMode['histDays'];              // datum. rozsah historie pro tvorbu reportu - pole má klíče "start" a "end", kde musí být "start" >= "end"
+$incrementalOn     = empty($incrementalMode['incrementalOn']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
+$incrCallsOnly     = empty($incrementalMode['incrCallsOnly']) ? false : true;   // vstupní hodnota false se vyhodnotí jako empty :)
+$histDays          = $incrementalMode['histDays'];          // datum. rozsah historie pro tvorbu reportu - pole má klíče "start" a "end", kde musí být "start" >= "end"
+$pkValsReserveDays = $incrementalMode['pkValsReserveDays']; // počet dní, o které je rozšířen rozsah daný $histDays pro načtení hodnot PK do pole $pkVals (použije se při integritní validaci)
 
 /* import parametru z JSON řetězce v definici Customer Science PHP v KBC:
     {
@@ -26,6 +27,10 @@ $histDays      = $incrementalMode['histDays'];              // datum. rozsah his
         "histDays": {
           "start": 1200,
           "end":   1150
+        },
+        "pkValsReserveDays": {
+          "start": 60,
+          "end":   5
         }
       },
       "processedInstances": {
