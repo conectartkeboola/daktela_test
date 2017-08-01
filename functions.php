@@ -218,7 +218,17 @@ function checkIdLengthOverflow ($val) {     // kontrola, zda došlo (true) nebo 
     return false;                           // nedošlo k přetečení (OK)
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function jsonParse ($formArr) {     // formArr je 2D-pole    
+function getJsonItem ($str, $key) {               // získání konkrétního prvku z JSON řetězce
+    $decod = json_decode($str, true, JSON_UNESCAPED_UNICODE);                   // dekódovaný řetězec (je-li $str JSON, je $decod ARRAY)
+    if (is_null  ($decod)) {return [];}
+    if ( is_array($decod)) {
+        if (array_key_exists($key, $decod)) {
+            return $decod[$key];                                                // $decod[$key] je STRING, INT, BOOL nebo ARRAY (dle struktury JSONu), nejčastěji ARRAY
+        }
+    } else return $decod;
+}
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function jsonParse ($formArr) {             // formArr je 2D-pole    
     global $formFieldsOuts, $tab, $fields, $idFieldSrcRec, $idFormat, $instId, $adhocDump;
     global ${"out_".$formFieldsOuts[$tab]};                                     // název out-only tabulky pro zápis hodnot formulářových polí
     foreach ($formArr as $key => $valArr) {                                     // $valArr je 1D-pole, obvykle má jen klíč 0 (nebo žádný)                                                                                                

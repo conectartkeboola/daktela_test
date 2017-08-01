@@ -73,10 +73,22 @@ foreach ($instances as $instId => $inst) {                                      
                     if (!dateRngCheck($row[$tiColId], "pkVals")) {continue;}    // hodnota atributu pro datumovou restrikci leží mimo požadovaný datumový rozsah → hodnota PK se neuloží, přechod na další řádek            
                 }
                 $pkVals[$instId][$tab][] = $row[$pkColId];                      // uložení hodnoty PK do pole $pkVals
-            }
+                // ..................................................................................................................................................................................
+                // přidání "id_call" z tabulky "activities" do PK tabulky "calls" (u aktivit typu CALL)    [do logu nevypisuje nic]
+                if ($tab == "activities") {
+                    $cols = $tabs_InOut_InOnly[$inst["ver"]]["activities"];     // pole ["název_sloupce_1" => ["instPrf"=>..., ...], "název_sloupce_2" => [...], ... ]
+                    $typeColId = array_search("type", array_keys($cols));       // ID sloupce "type" v tabulce "activities"
+                    $itemColId = array_search("item", array_keys($cols));       // ID sloupce "item" v tabulce "activities"
+                    if ($row[$typeColId] == "CALL") {                           // aktivita typu CALL
+                        $idcall = getJsonItem($row[$itemColId], "id_call");     // $row[$itemColId] ... JSON, z něj beru hodnotu "id_call"...
+                        $pkVals[$instId]["calls"][] = $idcall;                  // ... a uložím ji do pole $pkVals k hodnotám PK "calls"
+                    }
+                }
+                // ..................................................................................................................................................................................            
+            }            
             $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)
             $pkValsTabCnt = count($pkVals[$instId][$tab]);                      // počet unikátních hodnot PK pro danou tabulku  
-            checkIdLengthOverflow($pkValsTabCnt);                               // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
+            checkIdLengthOverflow($pkValsTabCnt);                               // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici           
             logInfo("V TABULCE ".$instId."_".$tab." JE ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK (ZA ZPRACOVÁVANÉ OBDOBÍ)");    // diagnostické výstupy do logu
             logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
             if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, $pkSampleCount));}          // $pkSampleCount - počet hodnot PK vypsaných na ukázku do logu
@@ -281,15 +293,15 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                         case [$tab,"idinstance"]:   $colVals[] = $instId;  break;               // hodnota = $instId    
                         // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------                                          
                         // TABULKY V6 ONLY
-                        case ["contacts","idcontact"]:$idFieldSrcRec = $colVals[]= $hodnota;// uložení hodnoty 'idcontact' pro následné použití v 'contFieldVals'
+                        case ["contacts","idcontact"]:$idFieldSrcRec = $colVals[]= $hodnota;    // uložení hodnoty 'idcontact' pro následné použití v 'contFieldVals'
                                                     break;
                         case ["contacts", "form"]:  // parsování "number" (veřejného tel. číslo) pro potřeby CRM records reportu
-                                                    $formArr = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);                                                    
                                                     $telNum = "";
-                                                    if (array_key_exists("number", $formArr)) {
-                                                        if (array_key_exists(0, $formArr["number"])) {
-                                                            $telNum = phoneNumberCanonic($formArr["number"][0]);    // uložení tel. čísla do proměnné $telNum
-                                                        }                           // $contactsForm["number"] ... obecně 1D-pole, kde může být více tel. čísel → beru jen první
+                                                    $numArr = getJsonItem($hodnota, "number");  // obecně vrací 1D-pole tel. čísel → beru jen první číslo
+                                                    if (is_array($numArr)) {
+                                                        if (array_key_exists(0, $numArr)) {
+                                                            $telNum = phoneNumberCanonic($numArr[0]); // uložení tel. čísla do proměnné $telNum
+                                                        }
                                                     }
                                                     break;                          // sloupec "form" se nepropisuje do výstupní tabulky "contacts"  
                         case ["contacts","number"]: $colVals[] = $telNum;           // hodnota vytvořená v case ["contacts", "form"]
@@ -321,6 +333,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     break;                        
                         case ["activities", "item"]:$colVals[] = $hodnota;          // obecně objekt (JSON), propisováno do OUT bucketu i bez parsování (potřebuji 'duration' v performance reportu)
                                                     if ($type != "CALL") {break;}   // pro aktivity typu != CALL nepokračovat sestavením hodnot do tabulky 'calls'
+                                                    
                                                     $item = json_decode($hodnota, true, JSON_UNESCAPED_UNICODE);
                                                     if (is_null($item)) {break;}    // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
 

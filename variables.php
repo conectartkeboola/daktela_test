@@ -67,21 +67,21 @@ $tabsInOutV56_part1 = [
     "queues"            =>  [   "idqueue"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
                                 "idinstance"            =>  ["instPrf" => 0],   // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
-                                "idgroup"               =>  ["instPrf" => 0]
-                            ],  // 'idgroup' je v IN tabulce NÁZEV → neprefixovat;  není to FK podléhající integritní validaci (groups jsou udvozeny z queues)
+                                "idgroup"               =>  ["instPrf" => 0]    // "fk" => "groups" neuvedeno ("groups" je out-only tabulka vytvářená v transformaci z "queues")
+                            ],                                                  // "idgroup" je v IN tabulce NÁZEV → neprefixovat
     "fields"            =>  [   "idfield"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0],
+                                "idinstance"            =>  ["instPrf" => 0],   // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "name"                  =>  ["instPrf" => 0]
                             ],
     "users"             =>  [   "iduser"                =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0],
+                                "idinstance"            =>  ["instPrf" => 0],   // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "email"                 =>  ["instPrf" => 0]
                             ],
     "pauses"            =>  [   "idpause"               =>  ["instPrf" => 1, "pk" => 1],
                                 "title"                 =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0],
+                                "idinstance"            =>  ["instPrf" => 0],   // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "type"                  =>  ["instPrf" => 0],
                                 "paid"                  =>  ["instPrf" => 0]
                             ],
@@ -133,7 +133,7 @@ $tabsInOutV5  = [
                                 "note"                  =>  ["instPrf" => 0],
                                 "attemps"               =>  ["instPrf" => 0],
                                 "qa_user_id"            =>  ["instPrf" => 0],
-                                "idinstance"            =>  ["instPrf" => 0]
+                                "idinstance"            =>  ["instPrf" => 0]    // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ] 
 ];
 $tabsInOutV56_part2 = [
@@ -144,7 +144,7 @@ $tabsInOutV56_part2 = [
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
                                 "iddatabase"            =>  ["instPrf" => 1, "fk" => "databases"],
                                 "number"                =>  ["instPrf" => 0],
-                                "idcall"                =>  ["instPrf" => 1],
+                                "idcall"                =>  ["instPrf" => 1, "fk" => "calls"],
                                 "action"                =>  ["instPrf" => 0],
                                 "edited"                =>  ["instPrf" => 0, "ti" => 1],
                                 "created"               =>  ["instPrf" => 0],
@@ -156,7 +156,7 @@ $tabsInOutV56_part2 = [
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"],
                                 "idrecord"              =>  ["instPrf" => 1, "fk" => "records"],
                                 "idstatus"              =>  ["instPrf" => 1, "fk" => "statuses"],
-                                "idcall"                =>  ["instPrf" => 1],
+                                "idcall"                =>  ["instPrf" => 1, "fk" => "calls"],
                                 "created"               =>  ["instPrf" => 0, "ti" => 1],
                                 "created_by"            =>  ["instPrf" => 1],                           // neuvažujeme jako FK do "users" (není to tak v GD)
                                 "nextcall"              =>  ["instPrf" => 0]
@@ -172,7 +172,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "stage"                 => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "time"                  => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ],
     "ticketSla"         =>  [   "idticketsla"           => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -183,15 +183,15 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "solution_low"          => ["instPrf" => 0],
                                 "solution_normal"       => ["instPrf" => 0],
                                 "solution_high"         => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ],
     "crmRecordTypes"    =>  [   "idcrmrecordtype"       => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
                                 "title"                 => ["instPrf" => 0],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0],        // neuvádět "ti" => 1, jde o tabulku stat. údajů, musejí být k dispozici pro podřazené "crmRecords
-                                "idinstance"            => ["instPrf" => 0]
+                                "created"               => ["instPrf" => 0],    // neuvádět "ti" => 1, jde o tabulku stat. údajů, musejí být k dispozici pro podřazené "crmRecords
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ],
     // skupina 7 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "accounts"          =>  [   "idaccount"             => ["instPrf" => 1, "pk" => 1],
@@ -202,7 +202,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "iduser"                => ["instPrf" => 1, "fk" => "users"],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ],
     "ticketCategories"  =>  [   "idticketcategory"      => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
@@ -213,7 +213,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "template_email"        => ["instPrf" => 0],
                                 "template_page"         => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ],
     // skupina 8 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "contacts"          =>  [   "idcontact"             => ["instPrf" => 1, "pk" => 1],
@@ -225,7 +225,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "iduser"                => ["instPrf" => 1, "fk" => "users"],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0],    // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "form"                  => ["instPrf" => 0, "json" => 1],
                                 "number"                => ["instPrf" => 0]
                             ],
@@ -259,7 +259,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "first_answer_duration" => ["instPrf" => 0],
                                 "closed"                => ["instPrf" => 0],
                                 "unread"                => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0],    // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "form"                  => ["instPrf" => 0, "json" => 0]
                             ],
     // skupina 10 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -277,7 +277,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "edited"                => ["instPrf" => 0, "ti" => 1],
                                 "created"               => ["instPrf" => 0],
                                 "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0],    // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "form"                  => ["instPrf" => 0, "json" => 0]
                             ],
     "activities"        =>  [   "idactivity"            => ["instPrf" => 1, "pk" => 1],
@@ -298,7 +298,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "time_open"             => ["instPrf" => 0],
                                 "time_close"            => ["instPrf" => 0],
                                 "created_by"            => ["instPrf" => 1],
-                                "idinstance"            => ["instPrf" => 0],
+                                "idinstance"            => ["instPrf" => 0],    // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                                 "item"                  => ["instPrf" => 0]
                             ],
     // skupina 11 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "created_by"            => ["instPrf" => 0],
                                 "time"                  => ["instPrf" => 0, "ti" => 1],
                                 "stage"                 => ["instPrf" => 0],
-                                "idinstance"            => ["instPrf" => 0]
+                                "idinstance"            => ["instPrf" => 0]     // "fk" => "instances" neuvedeno (u instancí není třeba integritní validace)
                             ]
 ];
 $tabsInOut = [
