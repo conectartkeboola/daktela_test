@@ -11,6 +11,8 @@ require_once $homeDir.$ds."kbc_param.php";                                      
 require_once $homeDir.$ds."variables.php";                                      // načtení definic proměnných a konstant
 require_once $homeDir.$ds."functions.php";                                      // načtení definic funkcí
 logInfo("PROMĚNNÉ A FUNKCE ZAVEDENY");                                          // volitelný diagnostický výstup do logu
+logInfo("ZPRACOVÁVANÝ DATUMOVÝ ROZSAH: ".$processedDates["start"]." - ".$processedDates["end"]);
+logInfo("DATUMOVÝ ROZSAH PRO NAČTENÍ HODNOT PK : ".$pkValsProcessedDates["start"]." - ".$pkValsProcessedDates["end"]);
 // ==============================================================================================================================================================================================
 // načtení vstupních souborů
 foreach ($instances as $instId => $inst) {
@@ -75,7 +77,7 @@ foreach ($instances as $instId => $inst) {                                      
             $pkVals[$instId][$tab] = !empty($pkVals[$instId][$tab]) ? array_values(array_unique($pkVals[$instId][$tab])) : [];  // eliminace příp. multiplicit hodnot PK (ale neměly by být)
             $pkValsTabCnt = count($pkVals[$instId][$tab]);                      // počet unikátních hodnot PK pro danou tabulku  
             checkIdLengthOverflow($pkValsTabCnt);                               // při překročení kapacity navýší délku inkrementálních indexů o 1 číslici
-            logInfo("V TABULCE ".$instId."_".$tab." NALEZENO ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK");                       // diagnostické výstupy do logu
+            logInfo("V TABULCE ".$instId."_".$tab." JE ".$pkValsTabCnt." ZÁZNAMŮ S UNIKÁTNÍMI PK (ZA ZPRACOVÁVANÉ OBDOBÍ)");    // diagnostické výstupy do logu
             logInfo("UNIKÁTNÍ PK V TABULCE ".$instId."_".$tab.": ", "basicIntegrInfo");
             if ($diagOutOptions["basicIntegrInfo"]) {print_r(array_slice($pkVals[$instId][$tab], 0, $pkSampleCount));}          // $pkSampleCount - počet hodnot PK vypsaných na ukázku do logu
             if($pkValsTabCnt > $pkSampleCount) {logInfo("... [ZKRÁCENÝ VÝPIS, CELKEM ".$pkValsTabCnt." POLOŽEK]", "basicIntegrInfo");}
