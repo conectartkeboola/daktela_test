@@ -11,8 +11,8 @@ require_once $homeDir.$ds."kbc_param.php";                                      
 require_once $homeDir.$ds."variables.php";                                      // načtení definic proměnných a konstant
 require_once $homeDir.$ds."functions.php";                                      // načtení definic funkcí
 logInfo("PROMĚNNÉ A FUNKCE ZAVEDENY");                                          // volitelný diagnostický výstup do logu
-logInfo("ZPRACOVÁVANÝ DATUMOVÝ ROZSAH: ".$processedDates["start"]." - ".$processedDates["end"]);
-logInfo("DATUMOVÝ ROZSAH PRO NAČTENÍ HODNOT PK : ".$pkValsProcessedDates["start"]." - ".$pkValsProcessedDates["end"]);
+logInfo("ZPRACOVÁVANÝ DATUMOVÝ ROZSAH:  ".$processedDates["start"]." ÷ ".$processedDates["end"]);
+logInfo("DATUMOVÝ ROZSAH PRO NAČTENÍ HODNOT PK:  ".$pkValsProcessedDates["start"]." ÷ ".$pkValsProcessedDates["end"]);
 // ==============================================================================================================================================================================================
 // načtení vstupních souborů
 foreach ($instances as $instId => $inst) {
@@ -23,11 +23,11 @@ foreach ($instances as $instId => $inst) {
 logInfo("VSTUPNÍ SOUBORY NAČTENY");     // volitelný diagnostický výstup do logu
 // ==============================================================================================================================================================================================
 logInfo("ZAHÁJENO NAČÍTÁNÍ DEFINICE DATOVÉHO MODELU");                          // volitelný diagnostický výstup do logu
-$jsonList = $tiList = $pkVals = $fkList = [];
-/* struktura polí:  $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON
-                    $tiList   = [$instId => [$tab => <název_časového_atributu>]]              ... pole indexů sloupců pro časovou restrikci záznamů
+$jsonList = $pkVals = $tiList = $fkList = [];
+/* struktura polí:  $jsonList = [$instId => [$tab => [$colName => <0~jen rozparsovat / 1~rozparsovat a pokračovat ve zpracování hodnoty>]]] ... pole sloupců obsahojících JSON                    
                     //$pkList = [$instId => [$tab => <název_PK>]]                             ... pole názvů PK pro vst. tabulky
-                    $pkVals   = [$instId => [$tab => [<pole existujících hodnot PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
+                    $pkVals   = [$instId => [$tab => [<pole_existujících_hodnot_PK>]]]        ... pole existujících hodnot PK pro vst. tabulky
+                    $tiList   = [$instId => [$tab => <ID_časového_atributu>]]                 ... pole indexů sloupců pro časovou restrikci záznamů
                     $fkList   = [$instId => [$tab => [$colName => <název_nadřazené_tabulky>]]]... pole názvů nadřazených tabulek pro každý sloupec, který je FK
 */
 foreach ($instances as $instId => $inst) {                                      // iterace instancí
@@ -113,7 +113,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
         foreach ($tabsFakeRow as $ftab) {
             $frow = array_merge([$fakeId, $fakeTitle], array_fill(2, $outTabsColsCount[$ftab] - 2, ""));
             ${"out_".$ftab} -> writeRow($frow);
-            logInfo("VLOŽEN UMĚLÝ ZÁZNAM S ID ".$fakeId." A NÁZVEM ".$fakeTitle." DO VÝSTUPNÍ TABULKY ".$ftab); // volitelný diag. výstup do logu
+            logInfo("VLOŽEN UMĚLÝ ZÁZNAM S ID ".$fakeId." A NÁZVEM \"".$fakeTitle."\" DO VÝSTUPNÍ TABULKY ".$ftab); // volitelný diag. výstup do logu
         }               // umělý řádek do aktuálně iterované tabulky ... ["n/a", "(empty value"), "", ... , ""]          
         $out_groups -> writeRow([$fakeId, $fakeTitle]);
     }
@@ -157,7 +157,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 if (!$incrCallsOnly) {                                              // inkrementálně zpracováváme všechny nestatické tabulky, nejen "calls" a "activities"
                     $dateRestrictColId = dateRestrictColId($instId, $tab);          // ID sloupce, který je v dané tabulce atributem pro datumovou restrikci (0,1,...), pokud v tabulce existuje
                     if (!is_null($dateRestrictColId)) {                             // sloupec pro datumovou restrikci záznamů v tabulce existuje
-                        if (!dateRngCheck($dateRestrictColId)) {continue;}          // hodnota atributu pro datumovou restrikci leží mimo zpracovávaný datumový rozsah → přechod na další řádek           
+                        if (!dateRngCheck($row[$dateRestrictColId])) {continue;}    // hodnota atributu pro datumovou restrikci leží mimo zpracovávaný datumový rozsah → přechod na další řádek           
                     }          
                 } 
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
