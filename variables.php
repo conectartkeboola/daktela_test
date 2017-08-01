@@ -50,9 +50,14 @@ foreach ($instancesList as $instId => $instAttrs) {     // $instId = "1", "2", .
 
 // vstupně-výstupní tabulky (načtou se jako vstupy, transformují se a výsledek je zapsán jako výstup)
 
-// "tab" => ["instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1), "pk" - primární klíč (0/1), "fk" - cizí klíč (tabName),
-//           "json" - jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty (0/1), "ti" - parametr pro časovou restrikci záznamů]
-
+/* "tab" => [   "instPrf" - prefixovat hodnoty ve sloupci identifikátorem instance (0/1),
+                "pk"   (nepovinné) - primární klíč (1),
+                "fk"   (nepovinné) - cizí klíč (tabName),
+                "json" (nepovinné) - jen rozparsovat / rozparsovat a pokračovat ve zpracování hodnoty (0/1),
+                "ti"   (nepovinné) - parametr pro časovou restrikci záznamů (1) - jen u tabulek obsahujících dynamické údaje
+                                     [statické se nesmějí datumově restringovat (např. "crmRecordTypes" datem vytvoření), musejí být k dispozici] 
+            ]
+*/
 $tabsInOutV56_part1 = [
     // skupina 1 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "statuses"          =>  [   "idstatus"              =>  ["instPrf" => 1, "pk" => 1],
@@ -185,7 +190,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "title"                 => ["instPrf" => 0],
                                 "description"           => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
-                                "created"               => ["instPrf" => 0, "ti" => 1],
+                                "created"               => ["instPrf" => 0],        // neuvádět "ti" => 1, jde o tabulku stat. údajů, musejí být k dispozici pro podřazené "crmRecords
                                 "idinstance"            => ["instPrf" => 0]
                             ],
     // skupina 7 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -248,7 +253,7 @@ $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u 
                                 "reopen"                => ["instPrf" => 0],
                                 "deleted"               => ["instPrf" => 0],
                                 "created"               => ["instPrf" => 0],
-                                "edited"                => ["instPrf" => 0, "ti" => 1],
+                                "edited"                => ["instPrf" => 0],        // neuvádět "ti" => 1, jde o tabulku stat. údajů, musejí být k dispozici pro podřazené "crmRecords
                                 "edited_by"             => ["instPrf" => 1],
                                 "first_answer"          => ["instPrf" => 0],
                                 "first_answer_duration" => ["instPrf" => 0],
