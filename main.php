@@ -70,7 +70,7 @@ foreach ($instances as $instId => $inst) {                                      
             foreach (${"in_".$tab."_".$instId} as $rowNum => $row) {            // iterace řádků vst. tabulek; $rowNum - ID řádku, $row - pole hodnot
                 if ($rowNum == 0) {continue;}                                   // vynechání hlavičky tabulky
                 if (!is_null($tiColId)) {                                       // pro danou tabulku je znám ID sloupce představujícího atribut pro datumovou restrikci
-                    if (!timeRngCheck($row[$tiColId], "pkVals")) {continue;}    // hodnota atributu pro datumovou restrikci leží mimo požadovaný datumový rozsah → hodnota PK se neuloží, přechod na další řádek            
+                    if (!dateRngCheck($row[$tiColId], "pkVals")) {continue;}    // hodnota atributu pro datumovou restrikci leží mimo požadovaný datumový rozsah → hodnota PK se neuloží, přechod na další řádek            
                 }
                 $pkVals[$instId][$tab][] = $row[$pkColId];                      // uložení hodnoty PK do pole $pkVals
             }
@@ -155,8 +155,10 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                 // při inkrementáním módu pro všechny nestatické tabulky (tj. nejen "calls" a "activities") přeskočení záznamů ležících mimo zpracovávaný datumový rozsah 
                 if (!$incrCallsOnly) {                                              // inkrementálně zpracováváme všechny nestatické tabulky, nejen "calls" a "activities"
-                    $timeColId = $tiList[$instId][$tab];                            // index sloupce, který je v dané tabulce atributem pro datumovou restrikci (0, 1, 2, ...)
-                    if (!timeRngCheck($row[$timeColId])) {continue;}                // hodnota atributu pro datumovou restrikci leží mimo zpracovávaný datumový rozsah → přechod na další řádek                
+                    $dateRestrictColId = dateRestrictColId($instId, $tab);          // ID sloupce, který je v dané tabulce atributem pro datumovou restrikci (0,1,...), pokud v tabulce existuje
+                    if (!is_null($dateRestrictColId)) {                             // sloupec pro datumovou restrikci záznamů v tabulce existuje
+                        if (!dateRngCheck($dateRestrictColId)) {continue;}          // hodnota atributu pro datumovou restrikci leží mimo zpracovávaný datumový rozsah → přechod na další řádek           
+                    }          
                 } 
                 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
                 $tabItems[$tab]++;                                                  // inkrement počitadla záznamů v tabulce
@@ -222,7 +224,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     }                                                
                                                     $colVals[] = $idGroupFormated;                              // vložení formátovaného ID skupiny jako prvního prvku do konstruovaného řádku 
                                                     break;
-                        case ["calls", "call_time"]:if (!timeRngCheck($hodnota)) {                              // 'call_time' není z požadovaného rozsahu -> ...
+                        case ["calls", "call_time"]:if (!dateRngCheck($hodnota)) {                              // 'call_time' není z požadovaného rozsahu -> ...
                                                         continue 3;                                             // ... řádek z tabulky 'calls' přeskočíme
                                                     } else {                                                    // 'call_time' je z požadovaného rozsahu -> ...
                                                         $colVals[] = $hodnota; break;                           // ... 'call_time' použijeme a normálně pokračujeme v konstrukci řádku...
@@ -323,7 +325,7 @@ while (!$idFormatIdEnoughDigits) {      // dokud není potvrzeno, že počet č�
                                                     if (is_null($item)) {break;}    // hodnota dekódovaného JSONu je null → nelze ji prohledávat jako pole
 
                                                     // příprava hodnot do řádku výstupní tabulky 'calls':
-                                                    if (!timeRngCheck($item["call_time"])) {continue 3;}    // 'call_time' není z požadovaného rozsahu -> řádek z tabulky 'activities' přeskočíme
+                                                    if (!dateRngCheck($item["call_time"])) {continue 3;}    // 'call_time' není z požadovaného rozsahu -> řádek z tabulky 'activities' přeskočíme
 
                                                     $callsVals = [  $item["id_call"],                       // konstrukce řádku výstupní tabulky 'calls'
                                                                     $item["call_time"],

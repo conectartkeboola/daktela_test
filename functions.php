@@ -191,7 +191,7 @@ function iterStatuses ($val, $valType = "statusIdOrig") {               // prohl
     return false;                   // zadaná hodnota v poli $statuses nenalezena
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function timeRngCheck ($val, $type = "tabRow") {                        // $val je datumočas ze zkoumaného záznamu
+function dateRngCheck ($val, $type = "tabRow") {                        // $val je datumočas ze zkoumaného záznamu
     global $incrementalOn, $processedDates, $pkValsProcessedDates;
     switch ($type) {
         case "tabRow":  $dateRng = $processedDates; break;              // pro validaci datumového rozsahu záznamů při zpracovávání záznamů
@@ -292,6 +292,15 @@ function jsonProcessing ($instId, $tab, $colName, $hodnota) {
         }
     }
     return true;                                                                // buňka neobsahovala JSON, po návratu z fce pokračovat ve zpracování hodnoty
+}
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function dateRestrictColId ($instId, $tab) {                                          // nalezení ID sloupce pro datumovou restrikci záznamů (pokud takový sloupec v tabulce existuje)
+    global $tiList;
+    if (array_key_exists($instId, $tiList)){
+        if (array_key_exists($tab, $tiList[$instId])) {                         // pro danou kombinaci instance-tabulka existuje atribut pro datumovou restrikci (není to např. statický údaj)
+            return $tiList[$instId][$tab];                                      // ID sloupce, který je v dané tabulce atributem pro datumovou restrikci (0, 1, 2, ...)
+        }
+    }                                                                           // při nenalezení ID sloupce pro datumovou restrikci (např. u statických tabulek) vrátí NULL
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 function colParentTab ($instId, $tab, $colName) {                               // nalezení názvu nadřazené tabulky pro daný sloupec (je-li sloupec FK)
