@@ -92,12 +92,6 @@ $tabsInOutV56_part1 = [
                                 "duration"              =>  ["instPrf" => 0],
                                 "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
                             ],
-    "readySessions"     =>  [   "idreadysession"        =>  ["instPrf" => 1, "pk" => 1],
-                                "start_time"            =>  ["instPrf" => 0, "ti" => 1],
-                                "end_time"              =>  ["instPrf" => 0],
-                                "duration"              =>  ["instPrf" => 0],
-                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
-                            ],
     "pauseSessions"     =>  [   "idpausesession"        =>  ["instPrf" => 1, "pk" => 1],
                                 "start_time"            =>  ["instPrf" => 0, "ti" => 1],
                                 "end_time"              =>  ["instPrf" => 0],
@@ -170,6 +164,12 @@ $tabsInOutV56_part2 = [
 ];
 $tabsInOutV6 = [            // vstupně-výstupní tabulky používané pouze u Daktely v6
     // skupina 6 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    "readySessions"     =>  [   "idreadysession"        =>  ["instPrf" => 1, "pk" => 1],
+                                "start_time"            =>  ["instPrf" => 0, "ti" => 1],
+                                "end_time"              =>  ["instPrf" => 0],
+                                "duration"              =>  ["instPrf" => 0],
+                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
+                            ],
     "databases"         =>  [   "iddatabase"            => ["instPrf" => 1, "pk" => 1],
                                 "name"                  => ["instPrf" => 0],
                                 "title"                 => ["instPrf" => 0],
