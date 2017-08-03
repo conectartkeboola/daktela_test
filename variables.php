@@ -37,7 +37,7 @@ foreach ($instancesList as $instId => $instAttrs) {     // $instId = "1", "2", .
    detailní požadavky pořadí tabulek (respektující integritní vazby mezi tabulkami pro správnou funkci integritní validace - stejné jako u writeru):
         skupina 1  -  (groups)*, (instances)*, statuses                         * - out-only tabulky, vznikají v transformaci
         skupina 2  -  queues, fields, users, pauses
-        skupina 3  -  loginSessions, pauseSessions, queueSessions, calls
+        skupina 3  -  loginSessions, readySessions, pauseSessions, queueSessions, calls
         skupina 4  -  records
         skupina 5  -  recordSnapshots, (fieldValues)*
         skupina 6  -  databases, ticketSla, crmRecordTypes
@@ -87,6 +87,12 @@ $tabsInOutV56_part1 = [
                             ],
     // skupina 3 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     "loginSessions"     =>  [   "idloginsession"        =>  ["instPrf" => 1, "pk" => 1],
+                                "start_time"            =>  ["instPrf" => 0, "ti" => 1],
+                                "end_time"              =>  ["instPrf" => 0],
+                                "duration"              =>  ["instPrf" => 0],
+                                "iduser"                =>  ["instPrf" => 1, "fk" => "users"]
+                            ],
+    "readySessions"     =>  [   "idreadysession"        =>  ["instPrf" => 1, "pk" => 1],
                                 "start_time"            =>  ["instPrf" => 0, "ti" => 1],
                                 "end_time"              =>  ["instPrf" => 0],
                                 "duration"              =>  ["instPrf" => 0],
