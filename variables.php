@@ -35,7 +35,7 @@ foreach ($instancesList as $instId => $instAttrs) {     // $instId = "1", "2", .
         - 'records' a 'recordSnapshots' se odkazují na 'statuses'.'idstatus' → musí být uvedeny až za 'statuses' (pro případ použití commonStatuses)
         - 'records' a 'fieldValues' se tvoří pomocí pole $fields vzniklého z tabulky 'fields' → musí být uvedeny až za 'fields' (kvůli foreach)
    detailní požadavky pořadí tabulek (respektující integritní vazby mezi tabulkami pro správnou funkci integritní validace - stejné jako u writeru):
-        skupina 1  -  (groups)*, (instances)*, statuses                         * - out-only tabulky, vznikají v transformaci
+        skupina 1  -  (groups)*, (instances)*, statuses                                     *  - out-only tabulky, vznikají v transformaci
         skupina 2  -  queues, fields, users, pauses
         skupina 3  -  loginSessions, readySessions, pauseSessions, queueSessions, calls
         skupina 4  -  records
@@ -44,7 +44,7 @@ foreach ($instancesList as $instId => $instAttrs) {     // $instId = "1", "2", .
         skupina 7  -  accounts, ticketCategories
         skupina 8  -  contacts
         skupina 9  -  tickets
-        skupina 10 -  crmRecords, activities
+        skupina 10 -  crmRecords, activities                                                ** - jen u Daktely ver. 6
         skupina 11 -  crmRecordSnapshots
 */
 
